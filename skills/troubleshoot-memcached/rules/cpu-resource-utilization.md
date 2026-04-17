@@ -1,8 +1,8 @@
-# Memcached: CPU & RESOURCE UTILIZATION signals
+# Memcached: Cpu & Resource Utilization signals
 
 ## Scope
 
-Signals in the CPU & RESOURCE UTILIZATION domain for Memcached, as defined in the Netdata operator
+Signals in the Cpu & Resource Utilization domain for Memcached, as defined in the Netdata operator
 playbook. Each signal includes a short description, the collection source, and a hint for the MCP
 query pattern that surfaces it. Use this file during a triage pass to decide which signal to pull
 first.

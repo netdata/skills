@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-oracle-database
-description: "Use when diagnosing issues with Oracle Database: \"lgwr can't keep up\", \"archive destination full\", or \"space exhaustion\". Queries Netdata via MCP for Oracle Database health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with Oracle Database: \"lgwr can't keep up\", \"archive destination full\", \"space exhaustion\", \"lock contention cascade\", or \"parse storm\". Queries Netdata via MCP for Oracle Database health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0

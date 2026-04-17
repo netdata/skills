@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-kubernetes-cluster-state
-description: "Use when diagnosing issues with Kubernetes Cluster State: Kubernetes Cluster State operational issues. Queries Netdata via MCP for api server health, etcd leader existence, api server request latency (p99), etcd wal fsync latency, etcd leader changes, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with Kubernetes Cluster State: control plane unavailable, control plane slow, reconciliation stall, node failures, or admission blockage. Queries Netdata via MCP for api server health, etcd leader existence, api server request latency (p99), etcd wal fsync latency, etcd leader changes, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -15,6 +15,24 @@ tags:
 
 ## When to use this skill
 
+- **Control plane unavailable**: etcd quorum loss, API server crash, or certificate expiration. The
+                                 cluster cannot schedule, reschedule, or update anything. Running
+                                 pods continue but cannot be managed.
+- **Control plane slow**: etcd disk latency, API server overload, webhook timeouts. Everything works
+                          but with unacceptable delays. Controllers fall behind, causing stale
+                          endpoints, missed scaling, delayed rollouts.
+- **Reconciliation stall**: A specific controller falls behind (workqueue depth grows). Deployments
+                            don't progress, endpoints go stale, garbage collection stops. The
+                            cluster "looks healthy" but desired state diverges from actual state
+                            silently.
+- **Node failures**: Kubelet crash, container runtime hang, network partition from control plane.
+                     Nodes become NotReady, pods are evicted, capacity shrinks.
+- **Admission blockage**: Webhook service down with `failurePolicy: Fail`. All matching resource
+                          creation/modification blocks. The cluster appears "frozen" for those
+                          resources.
+- **Silent drift**: Certificates approaching expiry, etcd database growing toward quota, IP address
+                    pool exhausting, resource requests exceeding allocatable. No immediate symptoms,
+                    but a cliff-edge failure is approaching.
 - Any time the user reports a Kubernetes Cluster State service behaving outside its expected
   envelope (elevated errors, latency, saturation, resource exhaustion, or unexpected restarts).
 - An on-call engineer is paging on a Netdata alert tied to a Kubernetes Cluster State instance and
@@ -31,8 +49,10 @@ tags:
   continuously. When monitoring cluster state, you are monitoring the health and velocity of this
   reconciliation loop.
 - The playbook decomposes Kubernetes Cluster State health into 13 signal domains: Control Plane
-  Availability, Control Plane Performance, etcd Health, Node Health, Kubelet Health, Pod Lifecycle.
+  Availability, Control Plane Performance, Etcd Health, Node Health, Kubelet Health, Pod Lifecycle.
   Each domain maps to one rule file in this skill.
+- Dominant failure archetypes the playbook calls out: Control plane unavailable; Control plane slow;
+  Reconciliation stall; Node failures; Admission blockage.
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your Kubernetes Cluster State instrumentation adds. Both paths
   end at the same MCP query surface.
@@ -45,9 +65,25 @@ tags:
 2. Pull the last 15 minutes of signals for the target. Use `query_metrics` against the contexts
    listed in the domain rule files. Run `find_anomalous_metrics` in parallel over the same window;
    anomalies frame which rule file to read first.
-3. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
+3. Check for **Control plane unavailable**. etcd quorum loss, API server crash, or certificate
+   expiration. The cluster cannot schedule, reschedule, or update anything. Running pods continue
+   but cannot be managed. Inspect the rule file whose signals move first for this mode.
+4. Check for **Control plane slow**. etcd disk latency, API server overload, webhook timeouts.
+   Everything works but with unacceptable delays. Controllers fall behind, causing stale endpoints,
+   missed scaling, delayed rollouts. Inspect the rule file whose signals move first for this mode.
+5. Check for **Reconciliation stall**. A specific controller falls behind (workqueue depth grows).
+   Deployments don't progress, endpoints go stale, garbage collection stops. The cluster "looks
+   healthy" but desired state diverges from actual state silently. Inspect the rule file whose
+   signals move first for this mode.
+6. Check for **Node failures**. Kubelet crash, container runtime hang, network partition from
+   control plane. Nodes become NotReady, pods are evicted, capacity shrinks. Inspect the rule file
+   whose signals move first for this mode.
+7. Check for **Admission blockage**. Webhook service down with `failurePolicy: Fail`. All matching
+   resource creation/modification blocks. The cluster appears "frozen" for those resources. Inspect
+   the rule file whose signals move first for this mode.
+8. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
    `system.disk.io_time`). Many service-level failures have a host-resource precursor.
-4. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
+9. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
    MCP queries from the Verification section to confirm the signals returned to expected ranges. A
    fix that does not move the signal back is not a fix.
 

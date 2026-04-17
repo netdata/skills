@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-memcached
-description: "Use when diagnosing issues with Memcached: Memcached operational issues. Queries Netdata via MCP for process liveness, unexpected restart (uptime reset), command rates (cmd_get, cmd_set, cmd_touch), flush all events (cmd_flush), cache hit ratio, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with Memcached: availability, throughput, hit rate & efficiency, or connections degradation. Queries Netdata via MCP for process liveness, unexpected restart (uptime reset), command rates (cmd_get, cmd_set, cmd_touch), flush all events (cmd_flush), cache hit ratio, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -27,8 +27,8 @@ tags:
 - Memcached is a multi-threaded, in-memory key-value cache daemon built on libevent. It does not
   persist data to disk; a restart means total data loss. Its design philosophy is "simple and fast":
   no replication, no clustering (clients shard), no built-in persistence.
-- The playbook decomposes Memcached health into 8 signal domains: AVAILABILITY, THROUGHPUT, HIT RATE
-  & EFFICIENCY, CONNECTIONS, MEMORY & SATURATION, INTERNAL STATE. Each domain maps to one rule file
+- The playbook decomposes Memcached health into 8 signal domains: Availability, Throughput, Hit Rate
+  & Efficiency, Connections, Memory & Saturation, Internal State. Each domain maps to one rule file
   in this skill.
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your Memcached instrumentation adds. Both paths end at the same

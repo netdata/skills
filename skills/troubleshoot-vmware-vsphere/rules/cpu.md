@@ -1,8 +1,8 @@
-# VMware vSphere: CPU signals
+# VMware vSphere: Cpu signals
 
 ## Scope
 
-Signals in the CPU domain for VMware vSphere, as defined in the Netdata operator playbook. Each
+Signals in the Cpu domain for VMware vSphere, as defined in the Netdata operator playbook. Each
 signal includes a short description, the collection source, and a hint for the MCP query pattern
 that surfaces it. Use this file during a triage pass to decide which signal to pull first.
 

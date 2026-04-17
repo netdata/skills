@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-nginx
-description: "Use when diagnosing issues with nginx: connection exhaustion, file descriptor exhaustion, or backend cascade failure. Queries Netdata via MCP for worker process count, stub status endpoint availability, requests per second, active connections, request processing time, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with nginx: connection exhaustion, file descriptor exhaustion, backend cascade failure, buffer spill to disk, or ssl cpu saturation. Queries Netdata via MCP for worker process count, stub status endpoint availability, requests per second, active connections, request processing time, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0

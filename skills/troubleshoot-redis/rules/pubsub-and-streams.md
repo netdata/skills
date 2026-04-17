@@ -1,8 +1,8 @@
-# Redis: Pub/Sub and Streams signals
+# Redis: Pub/Sub And Streams signals
 
 ## Scope
 
-Signals in the Pub/Sub and Streams domain for Redis, as defined in the Netdata operator playbook.
+Signals in the Pub/Sub And Streams domain for Redis, as defined in the Netdata operator playbook.
 Each signal includes a short description, the collection source, and a hint for the MCP query
 pattern that surfaces it. Use this file during a triage pass to decide which signal to pull first.
 

@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-pgbouncer
-description: "Use when diagnosing issues with PgBouncer: PgBouncer operational issues. Queries Netdata via MCP for PgBouncer health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with PgBouncer: pool exhaustion, client connection limit, file descriptor exhaustion, backend unreachable, or pool mode mismatch. Queries Netdata via MCP for PgBouncer health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -15,6 +15,25 @@ tags:
 
 ## When to use this skill
 
+- **Pool exhaustion**: All server connections busy then clients queue then wait times grow then
+                       application timeouts then cascading retries (thundering herd). This is the
+                       most common PgBouncer incident.
+- **Client connection limit**: `max_client_conn` reached then new connections rejected with `"no
+                               more connections allowed (max_client_conn)"`. Often caused by
+                               `max_client_conn` exceeding the FD limit.
+- **File descriptor exhaustion**: OS `ulimit` reached then cannot accept new connections, cannot
+                                  open log files. PgBouncer may crash-loop. Usually happens when
+                                  `max_client_conn` is set higher than the FD limit.
+- **Backend unreachable**: PostgreSQL down, network partition, or DNS failure then server
+                           connections cannot be established then clients queue indefinitely then
+                           `query_wait_timeout` fires.
+- **Pool mode mismatch**: Application uses session-dependent features (prepared statements, temp
+                          tables, `LISTEN/NOTIFY`, advisory locks, `SET` variables) in transaction
+                          pooling mode then silent data corruption or "does not exist" errors. This
+                          is the most insidious failure because it looks like an appl...
+- **Connection leak**: Applications hold connections without releasing them (long-running idle
+                       transactions in session mode, or abandoned connections) then pool exhaustion
+                       even under light load.
 - Any time the user reports a PgBouncer service behaving outside its expected envelope (elevated
   errors, latency, saturation, resource exhaustion, or unexpected restarts).
 - An on-call engineer is paging on a Netdata alert tied to a PgBouncer instance and wants a
@@ -28,6 +47,8 @@ tags:
   application clients and PostgreSQL backends. Its entire purpose is to reduce the number of actual
   PostgreSQL connections by sharing a smaller pool of server connections across many client
   connections.
+- Dominant failure archetypes the playbook calls out: Pool exhaustion; Client connection limit; File
+  descriptor exhaustion; Backend unreachable; Pool mode mismatch.
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your PgBouncer instrumentation adds. Both paths end at the same
   MCP query surface.
@@ -40,9 +61,26 @@ tags:
 2. Pull the last 15 minutes of signals for the target. Use `query_metrics` against the contexts
    listed in the domain rule files. Run `find_anomalous_metrics` in parallel over the same window;
    anomalies frame which rule file to read first.
-3. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
+3. Check for **Pool exhaustion**. All server connections busy then clients queue then wait times
+   grow then application timeouts then cascading retries (thundering herd). This is the most common
+   PgBouncer incident. Inspect the rule file whose signals move first for this mode.
+4. Check for **Client connection limit**. `max_client_conn` reached then new connections rejected
+   with `"no more connections allowed (max_client_conn)"`. Often caused by `max_client_conn`
+   exceeding the FD limit. Inspect the rule file whose signals move first for this mode.
+5. Check for **File descriptor exhaustion**. OS `ulimit` reached then cannot accept new connections,
+   cannot open log files. PgBouncer may crash-loop. Usually happens when `max_client_conn` is set
+   higher than the FD limit. Inspect the rule file whose signals move first for this mode.
+6. Check for **Backend unreachable**. PostgreSQL down, network partition, or DNS failure then server
+   connections cannot be established then clients queue indefinitely then `query_wait_timeout`
+   fires. Inspect the rule file whose signals move first for this mode.
+7. Check for **Pool mode mismatch**. Application uses session-dependent features (prepared
+   statements, temp tables, `LISTEN/NOTIFY`, advisory locks, `SET` variables) in transaction pooling
+   mode then silent data corruption or "does not exist" errors. This is the most insidious failure
+   because it looks like an application bug, not an infrastructure issue. Inspect the rule file
+   whose signals move first for this mode.
+8. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
    `system.disk.io_time`). Many service-level failures have a host-resource precursor.
-4. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
+9. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
    MCP queries from the Verification section to confirm the signals returned to expected ranges. A
    fix that does not move the signal back is not a fix.
 

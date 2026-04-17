@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-lvm
-description: "Use when diagnosing issues with LVM (Linux Logical Volume Manager): space exhaustion, device loss, or silent redundancy loss. Queries Netdata via MCP for LVM (Linux Logical Volume Manager) health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with LVM (Linux Logical Volume Manager): space exhaustion, device loss, silent redundancy loss, metadata corruption, or snapshot collapse. Queries Netdata via MCP for physical volume accessibility, lv activation state, volume group free space, thin pool data usage, mirror/raid synchronization status, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -47,6 +47,9 @@ tags:
 - LVM is a **storage virtualization layer** between physical block devices and
   filesystems/applications. It does not store data; it tells the kernel's **device-mapper (dm)**
   subsystem how to map I/O from virtual block devices to physical extents on real disks.
+- The playbook decomposes LVM (Linux Logical Volume Manager) health into 3 signal domains:
+  Availability Domain, Saturation Domain, Replication / Consistency Domain. Each domain maps to one
+  rule file in this skill.
 - Dominant failure archetypes the playbook calls out: Space exhaustion; Device loss; Silent
   redundancy loss; Metadata corruption; Snapshot collapse.
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
@@ -129,7 +132,12 @@ service:
 
 Signals the playbook considers load-bearing:
 
-  - the specific signals listed in the domain rule files
+  - Physical Volume Accessibility
+  - LV Activation State
+  - VG Metadata Consistency
+  - Volume Group Free Space
+  - Thin Pool Data Usage
+  - Thin Pool Metadata Usage
 
 A clean result means every key signal is within its expected band and the `find_anomalous_metrics`
 list is empty or contains only already-acknowledged items. If the fix was real, re-running the same
@@ -151,7 +159,9 @@ invisible at triage window sizes.
 
 ## References
 
-- [`rules/overview.md`](./rules/overview.md)
+- [`rules/availability-domain.md`](./rules/availability-domain.md)
+- [`rules/saturation-domain.md`](./rules/saturation-domain.md)
+- [`rules/replication-consistency-domain.md`](./rules/replication-consistency-domain.md)
 - Netdata operator playbook: the authoritative source material this skill summarizes.
 - `skills/netdata-mcp-integration/` for the transport setup.
 - `skills/netdata-otel-setup/` if additional application signals are needed beyond what Netdata

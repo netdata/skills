@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-zookeeper
-description: "Use when diagnosing issues with Apache ZooKeeper: quorum loss, write pipeline stall, or gc pause cascade. Queries Netdata via MCP for server state (role), service liveness, request latency (aggregated), write latency (update latency), outstanding requests (queue depth), applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with Apache ZooKeeper: quorum loss, write pipeline stall, gc pause cascade, session expiration storm, or heap exhaustion / oom. Queries Netdata via MCP for server state (role), service liveness, request latency (aggregated), write latency (update latency), outstanding requests (queue depth), applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0

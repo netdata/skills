@@ -34,7 +34,12 @@ SKILLS_DIR = REPO_ROOT / "skills"
 
 TROUBLESHOOT_PREFIX = "troubleshoot-"
 
-DOMAIN_HEADER_RE = re.compile(r"^#{3,4}\s*DOMAIN:\s*(.+?)\s*$", re.MULTILINE)
+DOMAIN_HEADER_RE = re.compile(
+    r"^(?:\*\*DOMAIN:\s*(?P<bold_domain>[^*]+?)\*\*"
+    r"|#{3,4}\s*DOMAIN:\s*(?P<named>.+?)"
+    r"|#{4}\s+(?!SIGNAL\b|Signal\s+\d|PATTERN\b)(?P<keyword>[A-Z][A-Z0-9 &/\-]{2,}))\s*$",
+    re.MULTILINE,
+)
 SIGNAL_HEADER_RE = re.compile(
     r"(?:^\*\*SIGNAL:\s*(?P<bold>.+?)\*\*|^#{3,5}\s*SIGNAL:\s*(?P<hash>.+?))"
     r"(?:\s*\[(?P<sev>HIGH|MEDIUM|LOW|MED)\])?\s*$",
@@ -44,7 +49,7 @@ SECTION0_RE = re.compile(r"^#{2,3}\s*SECTION\s*0\s*.*?$", re.MULTILINE)
 SECTION1_RE = re.compile(r"^#{2,3}\s*SECTION\s*1\s*.*?$", re.MULTILINE)
 SECTION2_RE = re.compile(r"^#{2,3}\s*SECTION\s*2\s*.*?$", re.MULTILINE)
 FAILURE_HEADER_RE = re.compile(
-    r"(?i)\*\*characteristic\s+failure\s+archetypes:?\*\*",
+    r"(?i)(?:\*\*|#{2,5}\s+)(?:characteristic\s+)?failure\s+archetypes[:.]?",
 )
 
 
@@ -141,11 +146,12 @@ def extract_failure_archetypes(section0: str) -> list[str]:
         )
     out = []
     for title, body in items:
-        title = title.strip().rstrip(".:").strip()
+        title = sanitize(title.strip().rstrip(".:").strip())
         body = body.strip()
         body = re.sub(r"\s+", " ", body)
-        if body.startswith("—") or body.startswith("-"):
+        if body.startswith("\u2014") or body.startswith("-"):
             body = body[1:].strip()
+        body = sanitize(body)
         out.append((title, body))
     return out  # type: ignore[return-value]
 
@@ -155,7 +161,15 @@ def extract_domains(section1: str) -> list[tuple[str, list[tuple[str, str]]]]:
     domains: list[tuple[str, list[tuple[str, str]]]] = []
     matches = list(DOMAIN_HEADER_RE.finditer(section1))
     for i, m in enumerate(matches):
-        name = m.group(1).strip().rstrip(".")
+        raw_name = (
+            m.group("bold_domain")
+            or m.group("named")
+            or m.group("keyword")
+            or ""
+        )
+        name = raw_name.strip().rstrip(".").title()
+        if not name:
+            continue
         start = m.end()
         end = matches[i + 1].start() if i + 1 < len(matches) else len(section1)
         block = section1[start:end]
@@ -172,19 +186,35 @@ def extract_domains(section1: str) -> list[tuple[str, list[tuple[str, str]]]]:
 def top_symptoms(failures: list[tuple[str, str]]) -> list[str]:
     if not failures:
         return []
-    return [t.lower() for t, _ in failures[:3]]
+    # Take up to 5 archetypes; more archetypes in the description sharpen
+    # activation matching against real user phrasings (for example,
+    # replication-lag prompts for MySQL hit archetype #5).
+    return [t.lower() for t, _ in failures[:5]]
+
+
+def _oxford_join(items: list[str]) -> str:
+    items = [i for i in items if i]
+    if not items:
+        return ""
+    if len(items) == 1:
+        return items[0]
+    if len(items) == 2:
+        return f"{items[0]} or {items[1]}"
+    return ", ".join(items[:-1]) + f", or {items[-1]}"
 
 
 def fmt_description(tech: str, symptoms: list[str], domains: list[tuple[str, list[tuple[str, str]]]]) -> str:
-    sym_clause = (
-        ", ".join(symptoms[:2]) + f", or {symptoms[2]}"
-        if len(symptoms) >= 3
-        else (", ".join(symptoms) if symptoms else f"{tech} operational issues")
-    )
+    if symptoms:
+        sym_clause = _oxford_join(symptoms)
+    elif domains:
+        dom_names = [d.lower() for d, _ in domains[:4]]
+        sym_clause = f"{_oxford_join(dom_names)} degradation"
+    else:
+        sym_clause = f"{tech} operational issues"
     key_metrics = []
     for _name, signals in domains[:3]:
         for sig, _sev in signals[:2]:
-            key_metrics.append(sig.lower())
+            key_metrics.append(sanitize(sig).lower())
     metrics_clause = ", ".join(key_metrics[:5]) if key_metrics else f"{tech} health signals"
     desc = (
         f"Use when diagnosing issues with {tech}: {sym_clause}. Queries "
@@ -380,7 +410,7 @@ def fmt_skill_md(
     probe_metrics: list[str] = []
     for _name, signals in domains[:2]:
         for sig, _sev in signals[:3]:
-            probe_metrics.append(sig)
+            probe_metrics.append(sanitize(sig))
     metric_bullets = "\n".join(f"  - {m}" for m in probe_metrics[:6]) or (
         "  - the specific signals listed in the domain rule files"
     )
@@ -582,7 +612,7 @@ def fmt_domain_rule(
     lines.append("")
     if signal_blocks:
         for sig_name, sev, blurb, source in signal_blocks:
-            lines.append(f"### {sig_name} [{sev}]")
+            lines.append(f"### {sanitize(sig_name)} [{sev}]")
             lines.append("")
             if blurb:
                 lines.append(wrap_plain(trim(blurb, 500)))

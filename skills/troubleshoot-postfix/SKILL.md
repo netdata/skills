@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-postfix
-description: "Use when diagnosing issues with Postfix: Postfix operational issues. Queries Netdata via MCP for Postfix health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with Postfix: availability domain, throughput domain, latency domain, or errors domain degradation. Queries Netdata via MCP for postfix master daemon running, smtp listener port accessibility, messages received per minute, messages delivered per minute, queue dwell time (average), applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -31,6 +31,9 @@ tags:
   accepts incoming mail from clients. Binds to port 25/587/465. - smtp: SMTP client daemon that
   delivers outgoing mail to remote servers. - qmgr (queue manager): The brain of Postfix. Manages
   all mail que...
+- The playbook decomposes Postfix health into 8 signal domains: Availability Domain, Throughput
+  Domain, Latency Domain, Errors Domain, Saturation Domain, Resource Utilization Domain. Each domain
+  maps to one rule file in this skill.
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your Postfix instrumentation adds. Both paths end at the same
   MCP query surface.
@@ -95,7 +98,10 @@ Run these MCP queries against the Netdata instance that sees the Postfix service
 
 Signals the playbook considers load-bearing:
 
-  - the specific signals listed in the domain rule files
+  - Postfix Master Daemon Running
+  - SMTP Listener Port Accessibility
+  - Messages Received Per Minute
+  - Messages Delivered Per Minute
 
 A clean result means every key signal is within its expected band and the `find_anomalous_metrics`
 list is empty or contains only already-acknowledged items. If the fix was real, re-running the same
@@ -117,7 +123,14 @@ invisible at triage window sizes.
 
 ## References
 
-- [`rules/overview.md`](./rules/overview.md)
+- [`rules/availability-domain.md`](./rules/availability-domain.md)
+- [`rules/throughput-domain.md`](./rules/throughput-domain.md)
+- [`rules/latency-domain.md`](./rules/latency-domain.md)
+- [`rules/errors-domain.md`](./rules/errors-domain.md)
+- [`rules/saturation-domain.md`](./rules/saturation-domain.md)
+- [`rules/resource-utilization-domain.md`](./rules/resource-utilization-domain.md)
+- [`rules/internal-state-domain.md`](./rules/internal-state-domain.md)
+- [`rules/replicationconsistency-domain.md`](./rules/replicationconsistency-domain.md)
 - Netdata operator playbook: the authoritative source material this skill summarizes.
 - `skills/netdata-mcp-integration/` for the transport setup.
 - `skills/netdata-otel-setup/` if additional application signals are needed beyond what Netdata

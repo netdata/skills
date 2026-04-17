@@ -1,8 +1,8 @@
-# Postfix: Overview signals
+# NVMe: I/O Volume signals
 
 ## Scope
 
-Signals in the Overview domain for Postfix, as defined in the Netdata operator playbook. Each signal
+Signals in the I/O Volume domain for NVMe, as defined in the Netdata operator playbook. Each signal
 includes a short description, the collection source, and a hint for the MCP query pattern that
 surfaces it. Use this file during a triage pass to decide which signal to pull first.
 
@@ -14,9 +14,41 @@ surfaces it. Use this file during a triage pass to decide which signal to pull f
 
 ## Signals
 
-No structured signal list was extracted from the playbook for the Overview domain. Fall back to the
-MCP discovery pattern: run `list_metrics` filtered by the Postfix service and inspect anything with
-matching keywords.
+### Data Units Read / Written [MEDIUM]
+
+Cumulative host-visible data volume transferred, in units of 1000 × 512 bytes (512KB per unit).
+
+Collection source: NVMe SMART log: `data_units_read`, `data_units_written`. Netdata context:
+`nvme.device_io_transferred_count`, dimensions: `read`, `written` (converted to bytes).
+
+MCP query: pull this signal with `query_metrics` and check the last 15 to 30 minutes against
+expected bands. Cross-reference with `find_anomalous_metrics` scoped to the same context. Use
+`find_correlated_metrics` if the signal has moved but the obvious cause is not visible.
+
+### PCIe AER Error Counters [HIGH]
+
+Advanced Error Reporting counters for the PCIe link: correctable errors, uncorrectable fatal errors,
+and uncorrectable non-fatal errors.
+
+Collection source: `/sys/class/nvme/nvmeX/device/aer_dev_correctable`; key: `TOTAL_ERR_COR`
+`/sys/class/nvme/nvmeX/device/aer_dev_fatal`; key: `TOTAL_ERR_FATAL`
+`/sys/class/nvme/nvmeX/device/aer_dev_nonfatal`; key: `TOTAL_ERR_NONFATAL`
+
+MCP query: pull this signal with `query_metrics` and check the last 15 to 30 minutes against
+expected bands. Cross-reference with `find_anomalous_metrics` scoped to the same context. Use
+`find_correlated_metrics` if the signal has moved but the obvious cause is not visible.
+
+### PCIe Link Speed/Width Degradation [MEDIUM]
+
+Whether the PCIe link is operating at its maximum negotiated speed and width.
+
+Collection source: `/sys/class/nvme/nvmeX/device/current_link_speed` vs
+`/sys/class/nvme/nvmeX/device/max_link_speed` `/sys/class/nvme/nvmeX/device/current_link_width` vs
+`/sys/class/nvme/nvmeX/device/max_link_width`
+
+MCP query: pull this signal with `query_metrics` and check the last 15 to 30 minutes against
+expected bands. Cross-reference with `find_anomalous_metrics` scoped to the same context. Use
+`find_correlated_metrics` if the signal has moved but the obvious cause is not visible.
 
 ## Triage order within this domain
 
@@ -53,7 +85,7 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
 
 # Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Postfix service (usually service.name or host.name)
+find_anomalous_metrics filtered by any attribute unique to the NVMe service (usually service.name or host.name)
 
 # Look for correlated signals outside this domain
 find_correlated_metrics around the incident window, limit 15

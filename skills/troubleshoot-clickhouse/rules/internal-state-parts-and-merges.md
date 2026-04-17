@@ -1,8 +1,8 @@
-# ClickHouse: Internal State; Parts and Merges signals
+# ClickHouse: Internal State; Parts And Merges signals
 
 ## Scope
 
-Signals in the Internal State; Parts and Merges domain for ClickHouse, as defined in the Netdata
+Signals in the Internal State; Parts And Merges domain for ClickHouse, as defined in the Netdata
 operator playbook. Each signal includes a short description, the collection source, and a hint for
 the MCP query pattern that surfaces it. Use this file during a triage pass to decide which signal to
 pull first.

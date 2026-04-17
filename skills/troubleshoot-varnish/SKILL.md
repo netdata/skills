@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-varnish
-description: "Use when diagnosing issues with Varnish Cache: Varnish Cache operational issues. Queries Netdata via MCP for session and request drop rate, backend health state, cache hit ratio, backend request rate, thread pool saturation, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with Varnish Cache: thread pool exhaustion, cache stampede (thundering herd), ban list explosion, storage exhaustion, or workspace overflow. Queries Netdata via MCP for session and request drop rate, backend health state, cache hit ratio, backend request rate, thread pool saturation, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -15,6 +15,25 @@ tags:
 
 ## When to use this skill
 
+- **Thread pool exhaustion**: All workers busy, queue fills, sessions/requests dropped. CPU may be
+                              idle while Varnish refuses connections. Root cause is usually slow
+                              backends holding threads or undersized `thread_pool_max`.
+- **Cache stampede (thundering herd)**: A popular cached object expires. Hundreds of concurrent
+                                        requests all miss, all fetch from backend simultaneously.
+                                        Backend overwhelmed. Without grace/stale-while-revalidate,
+                                        this cascades into backend overload.
+- **Ban list explosion**: Application logic issues bans faster than the ban lurker can process them.
+                          Ban list grows unbounded, cache lookups become O(n) on the ban list,
+                          latency spikes across all requests.
+- **Storage exhaustion**: The malloc/file storage fills. Aggressive LRU eviction begins, hit rate
+                          drops, backend load surges. With malloc, the cliff is sudden; once
+                          `g_space` reaches 0, allocation failures cause either object eviction or
+                          allocation failures.
+- **Workspace overflow**: HTTP headers or cookies exceed workspace allocation. Requests fail with
+                          500 errors. Often caused by large `Cookie` or `Set-Cookie` headers.
+- **Child process crash loop**: The child process panics, dumps core, and the management process
+                                restarts it. Cache is lost on each restart. Repeated crash-restart
+                                cycles mean zero effective caching.
 - Any time the user reports a Varnish Cache service behaving outside its expected envelope (elevated
   errors, latency, saturation, resource exhaustion, or unexpected restarts).
 - An on-call engineer is paging on a Netdata alert tied to a Varnish Cache instance and wants a
@@ -33,6 +52,8 @@ tags:
 - The playbook decomposes Varnish Cache health into 6 signal domains: Availability, Throughput &
   Efficiency, Saturation & Resources, Internal State, Backend Connections, Security & Integrity.
   Each domain maps to one rule file in this skill.
+- Dominant failure archetypes the playbook calls out: Thread pool exhaustion; Cache stampede
+  (thundering herd); Ban list explosion; Storage exhaustion; Workspace overflow.
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your Varnish Cache instrumentation adds. Both paths end at the
   same MCP query surface.
@@ -45,9 +66,27 @@ tags:
 2. Pull the last 15 minutes of signals for the target. Use `query_metrics` against the contexts
    listed in the domain rule files. Run `find_anomalous_metrics` in parallel over the same window;
    anomalies frame which rule file to read first.
-3. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
+3. Check for **Thread pool exhaustion**. All workers busy, queue fills, sessions/requests dropped.
+   CPU may be idle while Varnish refuses connections. Root cause is usually slow backends holding
+   threads or undersized `thread_pool_max`. Inspect the rule file whose signals move first for this
+   mode.
+4. Check for **Cache stampede (thundering herd)**. A popular cached object expires. Hundreds of
+   concurrent requests all miss, all fetch from backend simultaneously. Backend overwhelmed. Without
+   grace/stale-while-revalidate, this cascades into backend overload. Inspect the rule file whose
+   signals move first for this mode.
+5. Check for **Ban list explosion**. Application logic issues bans faster than the ban lurker can
+   process them. Ban list grows unbounded, cache lookups become O(n) on the ban list, latency spikes
+   across all requests. Inspect the rule file whose signals move first for this mode.
+6. Check for **Storage exhaustion**. The malloc/file storage fills. Aggressive LRU eviction begins,
+   hit rate drops, backend load surges. With malloc, the cliff is sudden; once `g_space` reaches 0,
+   allocation failures cause either object eviction or allocation failures. Inspect the rule file
+   whose signals move first for this mode.
+7. Check for **Workspace overflow**. HTTP headers or cookies exceed workspace allocation. Requests
+   fail with 500 errors. Often caused by large `Cookie` or `Set-Cookie` headers. Inspect the rule
+   file whose signals move first for this mode.
+8. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
    `system.disk.io_time`). Many service-level failures have a host-resource precursor.
-4. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
+9. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
    MCP queries from the Verification section to confirm the signals returned to expected ranges. A
    fix that does not move the signal back is not a fix.
 

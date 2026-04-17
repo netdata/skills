@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-apache-httpd
-description: "Use when diagnosing issues with Apache HTTPD: Apache HTTPD operational issues. Queries Netdata via MCP for process presence, critical-path reachability, requests per second, bytes served per second, request processing duration, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with Apache HTTPD: worker exhaustion, memory exhaustion, listen queue overflow, slow backend cascade, or log disk full / pipe stall. Queries Netdata via MCP for process presence, critical-path reachability, requests per second, bytes served per second, request processing duration, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -15,6 +15,18 @@ tags:
 
 ## When to use this skill
 
+- **Worker exhaustion**: All workers stuck (in W, R, D, or K states). New connections queue then
+                         drop. The most common "server down" symptom.
+- **Memory exhaustion**: MaxRequestWorkers × per-child RSS > available RAM. System swaps, latency
+                         spikes, OOM kills cascade.
+- **Listen queue overflow**: Workers occupied, backlog fills, SYN packets get RST. Server appears
+                             "up" (port open) but unreachable.
+- **Slow backend cascade**: Proxied requests hold workers waiting for slow/dead backends. Workers
+                            fill up from the backend side, not from traffic overload.
+- **Log disk full / pipe stall**: Workers finish requests but block in Logging state. Server appears
+                                  alive but serves nothing.
+- **Graceful restart pile-up**: Old-generation children linger during slow request completion.
+                                Multiple overlapping restarts multiply memory consumption.
 - Any time the user reports a Apache HTTPD service behaving outside its expected envelope (elevated
   errors, latency, saturation, resource exhaustion, or unexpected restarts).
 - An on-call engineer is paging on a Netdata alert tied to a Apache HTTPD instance and wants a
@@ -31,6 +43,8 @@ tags:
 - The playbook decomposes Apache HTTPD health into 9 signal domains: Availability, Throughput,
   Latency, Errors, Saturation, Resource Utilization. Each domain maps to one rule file in this
   skill.
+- Dominant failure archetypes the playbook calls out: Worker exhaustion; Memory exhaustion; Listen
+  queue overflow; Slow backend cascade; Log disk full / pipe stall.
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your Apache HTTPD instrumentation adds. Both paths end at the
   same MCP query surface.
@@ -43,9 +57,23 @@ tags:
 2. Pull the last 15 minutes of signals for the target. Use `query_metrics` against the contexts
    listed in the domain rule files. Run `find_anomalous_metrics` in parallel over the same window;
    anomalies frame which rule file to read first.
-3. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
+3. Check for **Worker exhaustion**. All workers stuck (in W, R, D, or K states). New connections
+   queue then drop. The most common "server down" symptom. Inspect the rule file whose signals move
+   first for this mode.
+4. Check for **Memory exhaustion**. MaxRequestWorkers × per-child RSS > available RAM. System swaps,
+   latency spikes, OOM kills cascade. Inspect the rule file whose signals move first for this mode.
+5. Check for **Listen queue overflow**. Workers occupied, backlog fills, SYN packets get RST. Server
+   appears "up" (port open) but unreachable. Inspect the rule file whose signals move first for this
+   mode.
+6. Check for **Slow backend cascade**. Proxied requests hold workers waiting for slow/dead backends.
+   Workers fill up from the backend side, not from traffic overload. Inspect the rule file whose
+   signals move first for this mode.
+7. Check for **Log disk full / pipe stall**. Workers finish requests but block in Logging state.
+   Server appears alive but serves nothing. Inspect the rule file whose signals move first for this
+   mode.
+8. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
    `system.disk.io_time`). Many service-level failures have a host-resource precursor.
-4. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
+9. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
    MCP queries from the Verification section to confirm the signals returned to expected ranges. A
    fix that does not move the signal back is not a fix.
 

@@ -1,8 +1,8 @@
-# Memcached: CONNECTIONS signals
+# Memcached: Connections signals
 
 ## Scope
 
-Signals in the CONNECTIONS domain for Memcached, as defined in the Netdata operator playbook. Each
+Signals in the Connections domain for Memcached, as defined in the Netdata operator playbook. Each
 signal includes a short description, the collection source, and a hint for the MCP query pattern
 that surfaces it. Use this file during a triage pass to decide which signal to pull first.
 

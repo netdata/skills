@@ -1,8 +1,8 @@
-# Kubernetes Cluster State: DNS signals
+# Kubernetes Cluster State: Dns signals
 
 ## Scope
 
-Signals in the DNS domain for Kubernetes Cluster State, as defined in the Netdata operator playbook.
+Signals in the Dns domain for Kubernetes Cluster State, as defined in the Netdata operator playbook.
 Each signal includes a short description, the collection source, and a hint for the MCP query
 pattern that surfaces it. Use this file during a triage pass to decide which signal to pull first.
 

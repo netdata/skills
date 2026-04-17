@@ -1,8 +1,8 @@
-# nginx: DNS Resolution (Dynamic Upstreams) signals
+# nginx: Dns Resolution (Dynamic Upstreams) signals
 
 ## Scope
 
-Signals in the DNS Resolution (Dynamic Upstreams) domain for nginx, as defined in the Netdata
+Signals in the Dns Resolution (Dynamic Upstreams) domain for nginx, as defined in the Netdata
 operator playbook. Each signal includes a short description, the collection source, and a hint for
 the MCP query pattern that surfaces it. Use this file during a triage pass to decide which signal to
 pull first.

@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-elasticsearch
-description: "Use when diagnosing issues with Elasticsearch: Elasticsearch operational issues. Queries Netdata via MCP for Elasticsearch health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with Elasticsearch: heap pressure death spiral, shard overallocation, disk watermark cascade, mapping explosion, or merge storms. Queries Netdata via MCP for Elasticsearch health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -15,6 +15,26 @@ tags:
 
 ## When to use this skill
 
+- **Heap Pressure Death Spiral**: Too much data in heap then frequent old-gen GC then long
+                                  stop-the-world pauses then node misses fault detection checks then
+                                  master removes node then triggers shard reallocation then more
+                                  heap pressure on remaining nodes then cascade.
+- **Shard Overallocation**: Too many shards (thousands per node). Each shard carries fixed overhead
+                            (segment metadata per field, thread contexts, buffers). Cluster becomes
+                            slow to manage, cluster state balloons, master nodes struggle.
+- **Disk Watermark Cascade**: Nodes hit high watermark then allocator relocates shards then target
+                              nodes approach watermark then relocations fail then flood stage then
+                              indices go read-only then writes fail. Block is automatically removed
+                              when disk drops below high watermark (7.x+, 8.x).
+- **Mapping Explosion**: Dynamic mapping creates a new field for every unique key then mappings with
+                         tens of thousands of fields then cluster state balloons then heap usage
+                         grows on every node then master instability.
+- **Merge Storms**: Bulk indexing creates many small segments then merge policy falls behind then
+                    search performance degrades then segment count and file descriptors grow then
+                    merge backlog compounds.
+- **Master Instability**: Master overwhelmed by cluster state updates (index creation/deletion,
+                          mapping changes, shard allocation) then election timeouts then all writes
+                          and administrative operations stall.
 - Any time the user reports a Elasticsearch service behaving outside its expected envelope (elevated
   errors, latency, saturation, resource exhaustion, or unexpected restarts).
 - An on-call engineer is paging on a Netdata alert tied to a Elasticsearch instance and wants a
@@ -28,6 +48,8 @@ tags:
 - Elasticsearch is a distributed search and analytics engine built on Apache Lucene. Every node runs
   several interacting subsystems that compete for the same resources. An operator must reason about
   these subsystems and their interactions to diagnose failures correctly.
+- Dominant failure archetypes the playbook calls out: Heap Pressure Death Spiral; Shard
+  Overallocation; Disk Watermark Cascade; Mapping Explosion; Merge Storms.
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your Elasticsearch instrumentation adds. Both paths end at the
   same MCP query surface.
@@ -40,9 +62,27 @@ tags:
 2. Pull the last 15 minutes of signals for the target. Use `query_metrics` against the contexts
    listed in the domain rule files. Run `find_anomalous_metrics` in parallel over the same window;
    anomalies frame which rule file to read first.
-3. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
+3. Check for **Heap Pressure Death Spiral**. Too much data in heap then frequent old-gen GC then
+   long stop-the-world pauses then node misses fault detection checks then master removes node then
+   triggers shard reallocation then more heap pressure on remaining nodes then cascade. Inspect the
+   rule file whose signals move first for this mode.
+4. Check for **Shard Overallocation**. Too many shards (thousands per node). Each shard carries
+   fixed overhead (segment metadata per field, thread contexts, buffers). Cluster becomes slow to
+   manage, cluster state balloons, master nodes struggle. Inspect the rule file whose signals move
+   first for this mode.
+5. Check for **Disk Watermark Cascade**. Nodes hit high watermark then allocator relocates shards
+   then target nodes approach watermark then relocations fail then flood stage then indices go
+   read-only then writes fail. Block is automatically removed when disk drops below high watermark
+   (7.x+, 8.x). Inspect the rule file whose signals move first for this mode.
+6. Check for **Mapping Explosion**. Dynamic mapping creates a new field for every unique key then
+   mappings with tens of thousands of fields then cluster state balloons then heap usage grows on
+   every node then master instability. Inspect the rule file whose signals move first for this mode.
+7. Check for **Merge Storms**. Bulk indexing creates many small segments then merge policy falls
+   behind then search performance degrades then segment count and file descriptors grow then merge
+   backlog compounds. Inspect the rule file whose signals move first for this mode.
+8. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
    `system.disk.io_time`). Many service-level failures have a host-resource precursor.
-4. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
+9. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
    MCP queries from the Verification section to confirm the signals returned to expected ranges. A
    fix that does not move the signal back is not a fix.
 

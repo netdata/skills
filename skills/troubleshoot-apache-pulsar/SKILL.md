@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-apache-pulsar
-description: "Use when diagnosing issues with Apache Pulsar: Apache Pulsar operational issues. Queries Netdata via MCP for broker process health, bookie process health, bookie journal sync latency, metadata store request latency, bookie add entry in-progress count, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with Apache Pulsar: availability, latency, saturation & resource utilization, or backlog & consumer health degradation. Queries Netdata via MCP for broker process health, bookie process health, bookie journal sync latency, metadata store request latency, bookie add entry in-progress count, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0

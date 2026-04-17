@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-postgresql
-description: "Use when diagnosing issues with PostgreSQL: connection exhaustion, lock contention cascade, or autovacuum starvation / bloat spiral. Queries Netdata via MCP for process liveness, recovery state, transaction rate (commits and rollbacks), row operations rate, query duration distribution, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with PostgreSQL: connection exhaustion, lock contention cascade, autovacuum starvation / bloat spiral, transaction id wraparound emergency, or checkpoint storms. Queries Netdata via MCP for process liveness, recovery state, transaction rate (commits and rollbacks), row operations rate, query duration distribution, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0

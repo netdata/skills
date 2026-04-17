@@ -1,8 +1,8 @@
-# Apache HTTPD: Proxy (mod_proxy) signals
+# Apache HTTPD: Proxy (Mod_Proxy) signals
 
 ## Scope
 
-Signals in the Proxy (mod_proxy) domain for Apache HTTPD, as defined in the Netdata operator
+Signals in the Proxy (Mod_Proxy) domain for Apache HTTPD, as defined in the Netdata operator
 playbook. Each signal includes a short description, the collection source, and a hint for the MCP
 query pattern that surfaces it. Use this file during a triage pass to decide which signal to pull
 first.

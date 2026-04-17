@@ -1,8 +1,8 @@
-# Apache ZooKeeper: JVM & Resource Utilization signals
+# Apache ZooKeeper: Jvm & Resource Utilization signals
 
 ## Scope
 
-Signals in the JVM & Resource Utilization domain for Apache ZooKeeper, as defined in the Netdata
+Signals in the Jvm & Resource Utilization domain for Apache ZooKeeper, as defined in the Netdata
 operator playbook. Each signal includes a short description, the collection source, and a hint for
 the MCP query pattern that surfaces it. Use this file during a triage pass to decide which signal to
 pull first.

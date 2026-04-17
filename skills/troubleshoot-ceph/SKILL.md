@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-ceph
-description: "Use when diagnosing issues with Ceph: Ceph operational issues. Queries Netdata via MCP for Ceph health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with Ceph: capacity exhaustion, stuck pgs, slow requests, mon quorum loss, or osd flapping. Queries Netdata via MCP for Ceph health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -15,6 +15,12 @@ tags:
 
 ## When to use this skill
 
+- **Capacity exhaustion**: Ceph throttles at nearfull (85%), blocks backfill at
+- **Stuck PGs**: PGs unable to reach active+clean due to failed OSDs, map inconsistencies,
+- **Slow requests**: OSD operations exceeding `osd_op_complaint_time` (default 30s). Causes
+- **MON quorum loss**: Without majority agreement, cluster cannot accept map updates. Client
+- **OSD flapping**: OSDs repeatedly marking up/down due to heartbeat timeouts, network
+- **Recovery storm**: Multiple OSD failures trigger massive data movement that competes with
 - Any time the user reports a Ceph service behaving outside its expected envelope (elevated errors,
   latency, saturation, resource exhaustion, or unexpected restarts).
 - An on-call engineer is paging on a Netdata alert tied to a Ceph instance and wants a structured
@@ -27,6 +33,8 @@ tags:
 - Ceph is a distributed storage system that presents block (RBD), file (CephFS), and object
   (RGW/S3/Swift) interfaces on top of RADOS (Reliable Autonomic Distributed Object Store).
   Everything is an object stored across OSDs, placed by the CRUSH algorithm.
+- Dominant failure archetypes the playbook calls out: Capacity exhaustion; Stuck PGs; Slow requests;
+  MON quorum loss; OSD flapping.
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your Ceph instrumentation adds. Both paths end at the same MCP
   query surface.
@@ -39,9 +47,19 @@ tags:
 2. Pull the last 15 minutes of signals for the target. Use `query_metrics` against the contexts
    listed in the domain rule files. Run `find_anomalous_metrics` in parallel over the same window;
    anomalies frame which rule file to read first.
-3. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
+3. Check for **Capacity exhaustion**. Ceph throttles at nearfull (85%), blocks backfill at Inspect
+   the rule file whose signals move first for this mode.
+4. Check for **Stuck PGs**. PGs unable to reach active+clean due to failed OSDs, map
+   inconsistencies, Inspect the rule file whose signals move first for this mode.
+5. Check for **Slow requests**. OSD operations exceeding `osd_op_complaint_time` (default 30s).
+   Causes Inspect the rule file whose signals move first for this mode.
+6. Check for **MON quorum loss**. Without majority agreement, cluster cannot accept map updates.
+   Client Inspect the rule file whose signals move first for this mode.
+7. Check for **OSD flapping**. OSDs repeatedly marking up/down due to heartbeat timeouts, network
+   Inspect the rule file whose signals move first for this mode.
+8. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
    `system.disk.io_time`). Many service-level failures have a host-resource precursor.
-4. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
+9. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
    MCP queries from the Verification section to confirm the signals returned to expected ranges. A
    fix that does not move the signal back is not a fix.
 

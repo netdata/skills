@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-redis
-description: "Use when diagnosing issues with Redis: the fork/cow storm, the event loop wedge, or the replication backlog overflow. Queries Netdata via MCP for redis reachability, uptime and unexpected restarts, memory usage ratio, memory fragmentation ratio, rejected connections, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with Redis: the fork/cow storm, the event loop wedge, the replication backlog overflow, the memory pressure spiral, or the connection exhaustion cascade. Queries Netdata via MCP for redis reachability, uptime and unexpected restarts, memory usage ratio, memory fragmentation ratio, rejected connections, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0

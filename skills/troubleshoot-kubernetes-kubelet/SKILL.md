@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-kubernetes-kubelet
-description: "Use when diagnosing issues with Kubernetes Kubelet: Kubernetes Kubelet operational issues. Queries Netdata via MCP for Kubernetes Kubelet health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with Kubernetes Kubelet: pleg stall, resource pressure cascade, api server disconnection, volume mount stuck, or silent new-pod outage. Queries Netdata via MCP for Kubernetes Kubelet health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -15,6 +15,23 @@ tags:
 
 ## When to use this skill
 
+- **PLEG Stall**: Container runtime becomes slow. PLEG relist exceeds 3 minutes. Node goes NotReady.
+                  The #1 cause of unexpected NotReady nodes.
+- **Resource Pressure Cascade**: Node runs low on memory/disk/PIDs. Eviction manager starts killing
+                                 pods. Killed pods get rescheduled, possibly back to the same node.
+                                 The node oscillates between pressure/no-pressure.
+- **API Server Disconnection**: Network partition, API server overload, or certificate expiry.
+                                Kubelet continues running existing pods autonomously but cannot
+                                receive new pods or report status. After ~350 seconds (50s grace +
+                                300s toleration), pods are rescheduled elsewhere.
+- **Volume Mount Stuck**: CSI driver or NFS mount hangs. Affected pods hang in ContainerCreating.
+                          Volume manager goroutines are blocked. Node appears healthy but pods with
+                          volumes stall.
+- **Silent New-Pod Outage**: Node is Ready, existing pods run fine, but new pods cannot start due to
+                             CNI failure, IPAM exhaustion, image pull failure, or CSI breakage.
+                             Classic partial outage.
+- **Kubelet OOM**: On very busy nodes, kubelet's own memory grows until the OOM killer targets it.
+                   Brief node NotReady, followed by a full reconciliation storm on restart.
 - Any time the user reports a Kubernetes Kubelet service behaving outside its expected envelope
   (elevated errors, latency, saturation, resource exhaustion, or unexpected restarts).
 - An on-call engineer is paging on a Netdata alert tied to a Kubernetes Kubelet instance and wants a
@@ -28,6 +45,8 @@ tags:
 - Kubelet is the node-level agent that makes Kubernetes real. Everything above it; API server,
   scheduler, controllers; deals in intent. Kubelet deals in reality: it receives pod specifications
   and turns them into running containers on a specific Linux machine.
+- Dominant failure archetypes the playbook calls out: PLEG Stall; Resource Pressure Cascade; API
+  Server Disconnection; Volume Mount Stuck; Silent New-Pod Outage.
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your Kubernetes Kubelet instrumentation adds. Both paths end at
   the same MCP query surface.
@@ -40,9 +59,26 @@ tags:
 2. Pull the last 15 minutes of signals for the target. Use `query_metrics` against the contexts
    listed in the domain rule files. Run `find_anomalous_metrics` in parallel over the same window;
    anomalies frame which rule file to read first.
-3. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
+3. Check for **PLEG Stall**. Container runtime becomes slow. PLEG relist exceeds 3 minutes. Node
+   goes NotReady. The #1 cause of unexpected NotReady nodes. Inspect the rule file whose signals
+   move first for this mode.
+4. Check for **Resource Pressure Cascade**. Node runs low on memory/disk/PIDs. Eviction manager
+   starts killing pods. Killed pods get rescheduled, possibly back to the same node. The node
+   oscillates between pressure/no-pressure. Inspect the rule file whose signals move first for this
+   mode.
+5. Check for **API Server Disconnection**. Network partition, API server overload, or certificate
+   expiry. Kubelet continues running existing pods autonomously but cannot receive new pods or
+   report status. After ~350 seconds (50s grace + 300s toleration), pods are rescheduled elsewhere.
+   Inspect the rule file whose signals move first for this mode.
+6. Check for **Volume Mount Stuck**. CSI driver or NFS mount hangs. Affected pods hang in
+   ContainerCreating. Volume manager goroutines are blocked. Node appears healthy but pods with
+   volumes stall. Inspect the rule file whose signals move first for this mode.
+7. Check for **Silent New-Pod Outage**. Node is Ready, existing pods run fine, but new pods cannot
+   start due to CNI failure, IPAM exhaustion, image pull failure, or CSI breakage. Classic partial
+   outage. Inspect the rule file whose signals move first for this mode.
+8. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
    `system.disk.io_time`). Many service-level failures have a host-resource precursor.
-4. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
+9. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
    MCP queries from the Verification section to confirm the signals returned to expected ranges. A
    fix that does not move the signal back is not a fix.
 

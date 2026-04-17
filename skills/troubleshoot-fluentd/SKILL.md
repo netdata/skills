@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-fluentd
-description: "Use when diagnosing issues with Fluentd: Fluentd operational issues. Queries Netdata via MCP for fluentd process alive, monitor agent api responsiveness, input emit records rate, output emit records rate, cumulative flush time, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with Fluentd: buffer saturation (backpressure), retry storm, memory bloat / oom, poison pill crash loop, or silent data loss. Queries Netdata via MCP for fluentd process alive, monitor agent api responsiveness, input emit records rate, output emit records rate, cumulative flush time, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -15,6 +15,12 @@ tags:
 
 ## When to use this skill
 
+- **Buffer Saturation (Backpressure)**: Destination slow/unreachable then buffer
+- **Retry Storm**: Output fails repeatedly then exponential backoff then queue never
+- **Memory Bloat / OOM**: Ruby memory fragmentation, or memory-backed buffers
+- **Poison Pill Crash Loop**: Malformed log line causes parser crash then process
+- **Silent Data Loss**: Events dropped due to `overflow_action: throw_exception`
+- **File Rotation Loss**: Improper handling of logrotate `copytruncate` causes
 - Any time the user reports a Fluentd service behaving outside its expected envelope (elevated
   errors, latency, saturation, resource exhaustion, or unexpected restarts).
 - An on-call engineer is paging on a Netdata alert tied to a Fluentd instance and wants a structured
@@ -29,6 +35,8 @@ tags:
   (outputs). Every event flows through this path:
 - The playbook decomposes Fluentd health into 8 signal domains: Availability, Throughput, Latency,
   Errors, Saturation, Input Health. Each domain maps to one rule file in this skill.
+- Dominant failure archetypes the playbook calls out: Buffer Saturation (Backpressure); Retry Storm;
+  Memory Bloat / OOM; Poison Pill Crash Loop; Silent Data Loss.
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your Fluentd instrumentation adds. Both paths end at the same
   MCP query surface.
@@ -41,9 +49,19 @@ tags:
 2. Pull the last 15 minutes of signals for the target. Use `query_metrics` against the contexts
    listed in the domain rule files. Run `find_anomalous_metrics` in parallel over the same window;
    anomalies frame which rule file to read first.
-3. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
+3. Check for **Buffer Saturation (Backpressure)**. Destination slow/unreachable then buffer Inspect
+   the rule file whose signals move first for this mode.
+4. Check for **Retry Storm**. Output fails repeatedly then exponential backoff then queue never
+   Inspect the rule file whose signals move first for this mode.
+5. Check for **Memory Bloat / OOM**. Ruby memory fragmentation, or memory-backed buffers Inspect the
+   rule file whose signals move first for this mode.
+6. Check for **Poison Pill Crash Loop**. Malformed log line causes parser crash then process Inspect
+   the rule file whose signals move first for this mode.
+7. Check for **Silent Data Loss**. Events dropped due to `overflow_action: throw_exception` Inspect
+   the rule file whose signals move first for this mode.
+8. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
    `system.disk.io_time`). Many service-level failures have a host-resource precursor.
-4. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
+9. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
    MCP queries from the Verification section to confirm the signals returned to expected ranges. A
    fix that does not move the signal back is not a fix.
 

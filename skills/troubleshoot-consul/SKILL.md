@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-consul
-description: "Use when diagnosing issues with Consul: leader instability, gossip partition / flapping, or catalog bloat / memory exhaustion. Queries Netdata via MCP for Consul health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with Consul: leader instability, gossip partition / flapping, catalog bloat / memory exhaustion, blocking query accumulation, or certificate/ca failures. Queries Netdata via MCP for Consul health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0

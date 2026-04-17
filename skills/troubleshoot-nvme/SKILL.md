@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-nvme
-description: "Use when diagnosing issues with NVMe: NVMe operational issues. Queries Netdata via MCP for NVMe health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with NVMe: availability, health & critical warnings, errors, or endurance & wear degradation. Queries Netdata via MCP for controller state, smart critical warning; read-only mode (bit 3), smart critical warning; nvm subsystem reliability degraded (bit 2), media and data integrity errors, error log entries, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -27,6 +27,9 @@ tags:
 - NVMe is a host-to-controller communication protocol that exposes flash storage over PCIe.
   Understanding NVMe monitoring requires understanding three layers: the PCIe transport, the NVMe
   controller, and the flash media behind it.
+- The playbook decomposes NVMe health into 8 signal domains: Availability, Health & Critical
+  Warnings, Errors, Endurance & Wear, Thermal, Power & Shutdown. Each domain maps to one rule file
+  in this skill.
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your NVMe instrumentation adds. Both paths end at the same MCP
   query surface.
@@ -91,7 +94,10 @@ Run these MCP queries against the Netdata instance that sees the NVMe service:
 
 Signals the playbook considers load-bearing:
 
-  - the specific signals listed in the domain rule files
+  - Controller State
+  - SMART Critical Warning; Read-Only Mode (Bit 3)
+  - SMART Critical Warning; NVM Subsystem Reliability Degraded (Bit 2)
+  - SMART Critical Warning; Available Spare Below Threshold (Bit 0)
 
 A clean result means every key signal is within its expected band and the `find_anomalous_metrics`
 list is empty or contains only already-acknowledged items. If the fix was real, re-running the same
@@ -113,7 +119,14 @@ invisible at triage window sizes.
 
 ## References
 
-- [`rules/overview.md`](./rules/overview.md)
+- [`rules/availability.md`](./rules/availability.md)
+- [`rules/health-critical-warnings.md`](./rules/health-critical-warnings.md)
+- [`rules/errors.md`](./rules/errors.md)
+- [`rules/endurance-wear.md`](./rules/endurance-wear.md)
+- [`rules/thermal.md`](./rules/thermal.md)
+- [`rules/power-shutdown.md`](./rules/power-shutdown.md)
+- [`rules/controller-performance.md`](./rules/controller-performance.md)
+- [`rules/io-volume.md`](./rules/io-volume.md)
 - Netdata operator playbook: the authoritative source material this skill summarizes.
 - `skills/netdata-mcp-integration/` for the transport setup.
 - `skills/netdata-otel-setup/` if additional application signals are needed beyond what Netdata

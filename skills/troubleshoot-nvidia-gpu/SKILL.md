@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-nvidia-gpu
-description: "Use when diagnosing issues with Nvidia Gpu: Nvidia Gpu operational issues. Queries Netdata via MCP for gpu reachability (driver communication), management path latency / driver health, gpu die temperature, hbm memory temperature, framebuffer memory utilization (vram), applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with Nvidia Gpu: memory exhaustion (oom), thermal runaway then throttling cascade, silent hardware degradation, interconnect degradation (straggler), or gpu hang / fallen off bus. Queries Netdata via MCP for gpu reachability (driver communication), management path latency / driver health, gpu die temperature, hbm memory temperature, framebuffer memory utilization (vram), applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -15,6 +15,22 @@ tags:
 
 ## When to use this skill
 
+- **Memory exhaustion (OOM)**: Allocation fails immediately. No gradual degradation; it's a cliff.
+                               The most common GPU workload failure.
+- **Thermal runaway then throttling cascade**: Temperature rises then clocks throttle then
+                                               performance collapses then system finds equilibrium
+                                               at terrible performance. Workload continues but 2-10x
+                                               slower.
+- **Silent hardware degradation**: ECC errors accumulate, memory corrupts intermittently, training
+                                   produces wrong results before anyone notices. The GPU "works" but
+                                   produces garbage.
+- **Interconnect degradation (straggler)**: One slow NVLink or degraded PCIe link in a distributed
+                                            training job creates a straggler that bottleneck-gates
+                                            the entire collective operation.
+- **GPU hang / fallen off bus**: GPU becomes unresponsive, nvidia-smi hangs, requires driver reload
+                                 or reboot. XID 79 = catastrophic PCIe link failure.
+- **Driver/process hang**: Stuck CUDA contexts hold GPU memory indefinitely. Zombie processes
+                           prevent resource reclamation. May require `nvidia-smi -r` or reboot.
 - Any time the user reports a Nvidia Gpu service behaving outside its expected envelope (elevated
   errors, latency, saturation, resource exhaustion, or unexpected restarts).
 - An on-call engineer is paging on a Netdata alert tied to a Nvidia Gpu instance and wants a
@@ -25,8 +41,11 @@ tags:
 - This skill wraps the Netdata operator playbook for Nvidia Gpu. It does not replace the playbook;
   it routes a coding agent through MCP queries against the same signals the playbook relies on.
 - The playbook decomposes Nvidia Gpu health into 8 signal domains: Availability, Thermal & Power,
-  Memory, Compute & Utilization, Interconnect, Errors (XID). Each domain maps to one rule file in
+  Memory, Compute & Utilization, Interconnect, Errors (Xid). Each domain maps to one rule file in
   this skill.
+- Dominant failure archetypes the playbook calls out: Memory exhaustion (OOM); Thermal runaway then
+  throttling cascade; Silent hardware degradation; Interconnect degradation (straggler); GPU hang /
+  fallen off bus.
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your Nvidia Gpu instrumentation adds. Both paths end at the
   same MCP query surface.
@@ -39,9 +58,24 @@ tags:
 2. Pull the last 15 minutes of signals for the target. Use `query_metrics` against the contexts
    listed in the domain rule files. Run `find_anomalous_metrics` in parallel over the same window;
    anomalies frame which rule file to read first.
-3. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
+3. Check for **Memory exhaustion (OOM)**. Allocation fails immediately. No gradual degradation; it's
+   a cliff. The most common GPU workload failure. Inspect the rule file whose signals move first for
+   this mode.
+4. Check for **Thermal runaway then throttling cascade**. Temperature rises then clocks throttle
+   then performance collapses then system finds equilibrium at terrible performance. Workload
+   continues but 2-10x slower. Inspect the rule file whose signals move first for this mode.
+5. Check for **Silent hardware degradation**. ECC errors accumulate, memory corrupts intermittently,
+   training produces wrong results before anyone notices. The GPU "works" but produces garbage.
+   Inspect the rule file whose signals move first for this mode.
+6. Check for **Interconnect degradation (straggler)**. One slow NVLink or degraded PCIe link in a
+   distributed training job creates a straggler that bottleneck-gates the entire collective
+   operation. Inspect the rule file whose signals move first for this mode.
+7. Check for **GPU hang / fallen off bus**. GPU becomes unresponsive, nvidia-smi hangs, requires
+   driver reload or reboot. XID 79 = catastrophic PCIe link failure. Inspect the rule file whose
+   signals move first for this mode.
+8. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
    `system.disk.io_time`). Many service-level failures have a host-resource precursor.
-4. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
+9. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
    MCP queries from the Verification section to confirm the signals returned to expected ranges. A
    fix that does not move the signal back is not a fix.
 

@@ -1,8 +1,8 @@
-# Memcached: AVAILABILITY signals
+# Memcached: Availability signals
 
 ## Scope
 
-Signals in the AVAILABILITY domain for Memcached, as defined in the Netdata operator playbook. Each
+Signals in the Availability domain for Memcached, as defined in the Netdata operator playbook. Each
 signal includes a short description, the collection source, and a hint for the MCP query pattern
 that surfaces it. Use this file during a triage pass to decide which signal to pull first.
 

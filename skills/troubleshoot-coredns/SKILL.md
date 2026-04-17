@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-coredns
-description: "Use when diagnosing issues with CoreDNS: CoreDNS operational issues. Queries Netdata via MCP for CoreDNS health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with CoreDNS: upstream black hole, cache collapse (thundering herd), kubernetes api disconnect, memory blowout, or forwarding loop. Queries Netdata via MCP for CoreDNS health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -15,6 +15,23 @@ tags:
 
 ## When to use this skill
 
+- **Upstream black hole**: All upstream DNS servers unreachable. Forward plugin fails immediately
+                           then SERVFAIL cascade to all clients. Latency is low (fast failure), not
+                           high.
+- **Cache collapse (thundering herd)**: After restart or cache eviction, all clients simultaneously
+                                        re-query the same records. Upstream flood can cause cascade
+                                        failure.
+- **Kubernetes API disconnect**: API server unreachable. CoreDNS serves stale data from last known
+                                 state (no immediate SERVFAIL), but new services are invisible.
+                                 Gradual degradation as state drifts.
+- **Memory blowout**: Unbounded cache growth or goroutine leak then OOM kill by container runtime.
+                      Cliff-edge failure with no gradual degradation.
+- **Forwarding loop**: Misconfiguration causes CoreDNS to forward to itself. The `loop` plugin
+                       detects this at startup and crashes (`log.Fatalf` then `os.Exit(1)`), causing
+                       CrashLoopBackOff in Kubernetes. Only detects loops at startup, not runtime.
+- **UDP buffer cliff**: Kernel UDP receive buffer fills then packets dropped silently before
+                        reaching CoreDNS. CoreDNS metrics look "too good to be true" (low latency,
+                        no errors, but low throughput).
 - Any time the user reports a CoreDNS service behaving outside its expected envelope (elevated
   errors, latency, saturation, resource exhaustion, or unexpected restarts).
 - An on-call engineer is paging on a Netdata alert tied to a CoreDNS instance and wants a structured
@@ -28,6 +45,8 @@ tags:
   query traverses an ordered chain of plugins defined in the `Corefile`. Each plugin can inspect,
   modify, respond to, or pass along the query. This is a pipeline; understanding the pipeline is the
   key to understanding every failure mode.
+- Dominant failure archetypes the playbook calls out: Upstream black hole; Cache collapse
+  (thundering herd); Kubernetes API disconnect; Memory blowout; Forwarding loop.
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your CoreDNS instrumentation adds. Both paths end at the same
   MCP query surface.
@@ -40,9 +59,25 @@ tags:
 2. Pull the last 15 minutes of signals for the target. Use `query_metrics` against the contexts
    listed in the domain rule files. Run `find_anomalous_metrics` in parallel over the same window;
    anomalies frame which rule file to read first.
-3. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
+3. Check for **Upstream black hole**. All upstream DNS servers unreachable. Forward plugin fails
+   immediately then SERVFAIL cascade to all clients. Latency is low (fast failure), not high.
+   Inspect the rule file whose signals move first for this mode.
+4. Check for **Cache collapse (thundering herd)**. After restart or cache eviction, all clients
+   simultaneously re-query the same records. Upstream flood can cause cascade failure. Inspect the
+   rule file whose signals move first for this mode.
+5. Check for **Kubernetes API disconnect**. API server unreachable. CoreDNS serves stale data from
+   last known state (no immediate SERVFAIL), but new services are invisible. Gradual degradation as
+   state drifts. Inspect the rule file whose signals move first for this mode.
+6. Check for **Memory blowout**. Unbounded cache growth or goroutine leak then OOM kill by container
+   runtime. Cliff-edge failure with no gradual degradation. Inspect the rule file whose signals move
+   first for this mode.
+7. Check for **Forwarding loop**. Misconfiguration causes CoreDNS to forward to itself. The `loop`
+   plugin detects this at startup and crashes (`log.Fatalf` then `os.Exit(1)`), causing
+   CrashLoopBackOff in Kubernetes. Only detects loops at startup, not runtime. Inspect the rule file
+   whose signals move first for this mode.
+8. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
    `system.disk.io_time`). Many service-level failures have a host-resource precursor.
-4. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
+9. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
    MCP queries from the Verification section to confirm the signals returned to expected ranges. A
    fix that does not move the signal back is not a fix.
 

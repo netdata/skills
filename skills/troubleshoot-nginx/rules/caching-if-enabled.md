@@ -1,8 +1,8 @@
-# nginx: Caching (if enabled) signals
+# nginx: Caching (If Enabled) signals
 
 ## Scope
 
-Signals in the Caching (if enabled) domain for nginx, as defined in the Netdata operator playbook.
+Signals in the Caching (If Enabled) domain for nginx, as defined in the Netdata operator playbook.
 Each signal includes a short description, the collection source, and a hint for the MCP query
 pattern that surfaces it. Use this file during a triage pass to decide which signal to pull first.
 

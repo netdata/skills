@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-kubernetes-api-server
-description: "Use when diagnosing issues with Kubernetes API Server: the webhook stall, the list storm, or the etcd latency cascade. Queries Netdata via MCP for Kubernetes API Server health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with Kubernetes API Server: the webhook stall, the list storm, the etcd latency cascade, the memory cliff, or the rbac/auth slow bleed. Queries Netdata via MCP for Kubernetes API Server health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0

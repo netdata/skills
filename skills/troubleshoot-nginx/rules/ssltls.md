@@ -1,8 +1,8 @@
-# nginx: SSL/TLS signals
+# nginx: Ssl/Tls signals
 
 ## Scope
 
-Signals in the SSL/TLS domain for nginx, as defined in the Netdata operator playbook. Each signal
+Signals in the Ssl/Tls domain for nginx, as defined in the Netdata operator playbook. Each signal
 includes a short description, the collection source, and a hint for the MCP query pattern that
 surfaces it. Use this file during a triage pass to decide which signal to pull first.
 

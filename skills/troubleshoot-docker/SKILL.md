@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-docker
-description: "Use when diagnosing issues with Docker: Docker operational issues. Queries Netdata via MCP for Docker health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with Docker: disk exhaustion, oom cascade, daemon hang/lockup, log explosion, or network isolation failure. Queries Netdata via MCP for Docker health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -15,6 +15,19 @@ tags:
 
 ## When to use this skill
 
+- **Disk exhaustion**: `/var/lib/docker` fills; all container writes fail, daemon halts. #1 cause of
+                       Docker outages.
+- **OOM cascade**: Container(s) hit memory limit then OOM kill then restart then immediate OOM
+                   again. Or: host memory exhaustion then kernel OOM kills unpredictably across
+                   containers.
+- **Daemon hang/lockup**: Storage driver deadlock, slow disk, lock contention. API calls timeout.
+                          Running containers continue serving but cannot be managed.
+- **Log explosion**: Default json-file driver has NO rotation. A verbose container fills disk in
+                     hours.
+- **Network isolation failure**: iptables flush, rule collision, conntrack exhaustion. Containers
+                                 lose connectivity.
+- **Shim process leak**: Container exits but shim remains, consuming PIDs and memory. Accumulates
+                         silently.
 - Any time the user reports a Docker service behaving outside its expected envelope (elevated
   errors, latency, saturation, resource exhaustion, or unexpected restarts).
 - An on-call engineer is paging on a Netdata alert tied to a Docker instance and wants a structured
@@ -27,6 +40,8 @@ tags:
 - Docker is a layered container runtime system. Understanding its internal architecture is essential
   for diagnosing failures, because the layer where a problem occurs determines the operator
   response.
+- Dominant failure archetypes the playbook calls out: Disk exhaustion; OOM cascade; Daemon
+  hang/lockup; Log explosion; Network isolation failure.
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your Docker instrumentation adds. Both paths end at the same
   MCP query surface.
@@ -39,9 +54,21 @@ tags:
 2. Pull the last 15 minutes of signals for the target. Use `query_metrics` against the contexts
    listed in the domain rule files. Run `find_anomalous_metrics` in parallel over the same window;
    anomalies frame which rule file to read first.
-3. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
+3. Check for **Disk exhaustion**. `/var/lib/docker` fills; all container writes fail, daemon halts.
+   #1 cause of Docker outages. Inspect the rule file whose signals move first for this mode.
+4. Check for **OOM cascade**. Container(s) hit memory limit then OOM kill then restart then
+   immediate OOM again. Or: host memory exhaustion then kernel OOM kills unpredictably across
+   containers. Inspect the rule file whose signals move first for this mode.
+5. Check for **Daemon hang/lockup**. Storage driver deadlock, slow disk, lock contention. API calls
+   timeout. Running containers continue serving but cannot be managed. Inspect the rule file whose
+   signals move first for this mode.
+6. Check for **Log explosion**. Default json-file driver has NO rotation. A verbose container fills
+   disk in hours. Inspect the rule file whose signals move first for this mode.
+7. Check for **Network isolation failure**. iptables flush, rule collision, conntrack exhaustion.
+   Containers lose connectivity. Inspect the rule file whose signals move first for this mode.
+8. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
    `system.disk.io_time`). Many service-level failures have a host-resource precursor.
-4. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
+9. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
    MCP queries from the Verification section to confirm the signals returned to expected ranges. A
    fix that does not move the signal back is not a fix.
 

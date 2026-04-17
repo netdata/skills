@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-tomcat
-description: "Use when diagnosing issues with Apache Tomcat: Apache Tomcat operational issues. Queries Netdata via MCP for thread pool utilization, jvm process alive, request throughput, bytes sent/received rate, request processing time, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with Apache Tomcat: thread pool exhaustion, heap exhaustion / gc death spiral, classloader leak on redeploy, stuck threads, or connection saturation. Queries Netdata via MCP for thread pool utilization, jvm process alive, request throughput, bytes sent/received rate, request processing time, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -15,6 +15,21 @@ tags:
 
 ## When to use this skill
 
+- **Thread pool exhaustion**: the most common Tomcat failure. Slow backends, long-running requests,
+                              or connection storms consume all threads. Application appears "hung"
+                              even though JVM is healthy.
+- **Heap exhaustion / GC death spiral**: session accumulation or app memory leaks fill the heap. GC
+                                         runs more frequently then positive feedback loop then
+                                         `OutOfMemoryError` or livelock.
+- **Classloader leak on redeploy**: each hot redeploy leaks the previous webapp's classloader.
+                                    Metaspace grows monotonically. After N redeploys:
+                                    `OutOfMemoryError: Metaspace`.
+- **Stuck threads**: a thread blocks indefinitely on a backend call with no timeout. Permanently
+                     consumed.
+- **Connection saturation**: `maxConnections` reached (NIO poller full), then `acceptCount` queue
+                             fills. New TCP connections get RST.
+- **File descriptor exhaustion**: socket leaks, excessive logging, or low ulimit then
+                                  `SocketException: Too many open files`.
 - Any time the user reports a Apache Tomcat service behaving outside its expected envelope (elevated
   errors, latency, saturation, resource exhaustion, or unexpected restarts).
 - An on-call engineer is paging on a Netdata alert tied to a Apache Tomcat instance and wants a
@@ -27,6 +42,8 @@ tags:
   relies on.
 - The playbook decomposes Apache Tomcat health into 6 signal domains: Availability, Throughput,
   Latency, Errors, Saturation, Internal State. Each domain maps to one rule file in this skill.
+- Dominant failure archetypes the playbook calls out: Thread pool exhaustion; Heap exhaustion / GC
+  death spiral; Classloader leak on redeploy; Stuck threads; Connection saturation.
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your Apache Tomcat instrumentation adds. Both paths end at the
   same MCP query surface.
@@ -39,9 +56,23 @@ tags:
 2. Pull the last 15 minutes of signals for the target. Use `query_metrics` against the contexts
    listed in the domain rule files. Run `find_anomalous_metrics` in parallel over the same window;
    anomalies frame which rule file to read first.
-3. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
+3. Check for **Thread pool exhaustion**. the most common Tomcat failure. Slow backends, long-running
+   requests, or connection storms consume all threads. Application appears "hung" even though JVM is
+   healthy. Inspect the rule file whose signals move first for this mode.
+4. Check for **Heap exhaustion / GC death spiral**. session accumulation or app memory leaks fill
+   the heap. GC runs more frequently then positive feedback loop then `OutOfMemoryError` or
+   livelock. Inspect the rule file whose signals move first for this mode.
+5. Check for **Classloader leak on redeploy**. each hot redeploy leaks the previous webapp's
+   classloader. Metaspace grows monotonically. After N redeploys: `OutOfMemoryError: Metaspace`.
+   Inspect the rule file whose signals move first for this mode.
+6. Check for **Stuck threads**. a thread blocks indefinitely on a backend call with no timeout.
+   Permanently consumed. Inspect the rule file whose signals move first for this mode.
+7. Check for **Connection saturation**. `maxConnections` reached (NIO poller full), then
+   `acceptCount` queue fills. New TCP connections get RST. Inspect the rule file whose signals move
+   first for this mode.
+8. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
    `system.disk.io_time`). Many service-level failures have a host-resource precursor.
-4. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
+9. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
    MCP queries from the Verification section to confirm the signals returned to expected ranges. A
    fix that does not move the signal back is not a fix.
 

@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-rabbitmq
-description: "Use when diagnosing issues with RabbitMQ: RabbitMQ operational issues. Queries Netdata via MCP for RabbitMQ health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with RabbitMQ: availability, resource alarms, throttling & backpressure, or throughput degradation. Queries Netdata via MCP for node availability status, network partition status, memory alarm status, disk free alarm status, connection flow control state, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -27,6 +27,9 @@ tags:
 - RabbitMQ is an AMQP 0-9-1 message broker built on the Erlang/OTP runtime (BEAM VM). Understanding
   its operational behavior requires thinking in terms of Erlang processes, message passing, and
   supervision trees; not threads and shared memory.
+- The playbook decomposes RabbitMQ health into 10 signal domains: Availability, Resource Alarms,
+  Throttling & Backpressure, Throughput, Queue Depth, Resource Utilization. Each domain maps to one
+  rule file in this skill.
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your RabbitMQ instrumentation adds. Both paths end at the same
   MCP query surface.
@@ -91,7 +94,11 @@ Run these MCP queries against the Netdata instance that sees the RabbitMQ servic
 
 Signals the playbook considers load-bearing:
 
-  - the specific signals listed in the domain rule files
+  - Node Availability Status
+  - Network Partition Status
+  - Vhost Status
+  - Memory Alarm Status
+  - Disk Free Alarm Status
 
 A clean result means every key signal is within its expected band and the `find_anomalous_metrics`
 list is empty or contains only already-acknowledged items. If the fix was real, re-running the same
@@ -113,7 +120,16 @@ invisible at triage window sizes.
 
 ## References
 
-- [`rules/overview.md`](./rules/overview.md)
+- [`rules/availability.md`](./rules/availability.md)
+- [`rules/resource-alarms.md`](./rules/resource-alarms.md)
+- [`rules/throttling-backpressure.md`](./rules/throttling-backpressure.md)
+- [`rules/throughput.md`](./rules/throughput.md)
+- [`rules/queue-depth.md`](./rules/queue-depth.md)
+- [`rules/resource-utilization.md`](./rules/resource-utilization.md)
+- [`rules/objects-churn.md`](./rules/objects-churn.md)
+- [`rules/cluster-health.md`](./rules/cluster-health.md)
+- [`rules/queue-level-metrics.md`](./rules/queue-level-metrics.md)
+- [`rules/consumer-health.md`](./rules/consumer-health.md)
 - Netdata operator playbook: the authoritative source material this skill summarizes.
 - `skills/netdata-mcp-integration/` for the transport setup.
 - `skills/netdata-otel-setup/` if additional application signals are needed beyond what Netdata

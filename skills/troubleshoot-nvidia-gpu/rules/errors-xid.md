@@ -1,8 +1,8 @@
-# Nvidia Gpu: Errors (XID) signals
+# Nvidia Gpu: Errors (Xid) signals
 
 ## Scope
 
-Signals in the Errors (XID) domain for Nvidia Gpu, as defined in the Netdata operator playbook. Each
+Signals in the Errors (Xid) domain for Nvidia Gpu, as defined in the Netdata operator playbook. Each
 signal includes a short description, the collection source, and a hint for the MCP query pattern
 that surfaces it. Use this file during a triage pass to decide which signal to pull first.
 

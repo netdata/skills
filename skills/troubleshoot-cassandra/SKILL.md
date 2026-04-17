@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-cassandra
-description: "Use when diagnosing issues with Apache Cassandra: Apache Cassandra operational issues. Queries Netdata via MCP for node liveness (failure detector), native transport active, client request rate (read/write), client request latency (coordinator), applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with Apache Cassandra: gc death spiral, compaction death spiral, tombstone storm, disk space exhaustion, or hint overflow. Queries Netdata via MCP for node liveness (failure detector), native transport active, client request rate (read/write), client request latency (coordinator), applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -15,6 +15,19 @@ tags:
 
 ## When to use this skill
 
+- **GC Death Spiral**: Heap pressure then long GC pauses then gossip failures then node marked DOWN
+                       then client retries flood then more heap pressure. Self-reinforcing.
+- **Compaction Death Spiral**: Write rate exceeds compaction throughput then SSTables accumulate
+                               then read amplification increases then latency spikes then more
+                               compaction needed then disk I/O saturated.
+- **Tombstone Storm**: Accumulated tombstones (deletes/expired TTLs) force reads to scan massive
+                       amounts of dead data then read latency spikes, possible query abortion at
+                       100K tombstones.
+- **Disk Space Exhaustion**: Compaction backlog + snapshots + hints consume space then compaction
+                             cannot run (needs temporary space) then writes blocked.
+- **Hint Overflow**: Long node outage then hints accumulate on coordinators then hints expire
+                     (`max_hint_window`, default 3h) then data permanently inconsistent unless
+                     repaired.
 - Any time the user reports a Apache Cassandra service behaving outside its expected envelope
   (elevated errors, latency, saturation, resource exhaustion, or unexpected restarts).
 - An on-call engineer is paging on a Netdata alert tied to a Apache Cassandra instance and wants a
@@ -28,6 +41,8 @@ tags:
 - The playbook decomposes Apache Cassandra health into 8 signal domains: Availability, Throughput,
   Latency, Errors, Saturation / Internal State, Replication / Consistency. Each domain maps to one
   rule file in this skill.
+- Dominant failure archetypes the playbook calls out: GC Death Spiral; Compaction Death Spiral;
+  Tombstone Storm; Disk Space Exhaustion; Hint Overflow.
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your Apache Cassandra instrumentation adds. Both paths end at
   the same MCP query surface.
@@ -40,9 +55,24 @@ tags:
 2. Pull the last 15 minutes of signals for the target. Use `query_metrics` against the contexts
    listed in the domain rule files. Run `find_anomalous_metrics` in parallel over the same window;
    anomalies frame which rule file to read first.
-3. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
+3. Check for **GC Death Spiral**. Heap pressure then long GC pauses then gossip failures then node
+   marked DOWN then client retries flood then more heap pressure. Self-reinforcing. Inspect the rule
+   file whose signals move first for this mode.
+4. Check for **Compaction Death Spiral**. Write rate exceeds compaction throughput then SSTables
+   accumulate then read amplification increases then latency spikes then more compaction needed then
+   disk I/O saturated. Inspect the rule file whose signals move first for this mode.
+5. Check for **Tombstone Storm**. Accumulated tombstones (deletes/expired TTLs) force reads to scan
+   massive amounts of dead data then read latency spikes, possible query abortion at 100K
+   tombstones. Inspect the rule file whose signals move first for this mode.
+6. Check for **Disk Space Exhaustion**. Compaction backlog + snapshots + hints consume space then
+   compaction cannot run (needs temporary space) then writes blocked. Inspect the rule file whose
+   signals move first for this mode.
+7. Check for **Hint Overflow**. Long node outage then hints accumulate on coordinators then hints
+   expire (`max_hint_window`, default 3h) then data permanently inconsistent unless repaired.
+   Inspect the rule file whose signals move first for this mode.
+8. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
    `system.disk.io_time`). Many service-level failures have a host-resource precursor.
-4. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
+9. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
    MCP queries from the Verification section to confirm the signals returned to expected ranges. A
    fix that does not move the signal back is not a fix.
 

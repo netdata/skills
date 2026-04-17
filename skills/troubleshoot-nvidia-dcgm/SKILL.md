@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-nvidia-dcgm
-description: "Use when diagnosing issues with NVIDIA DCGM: NVIDIA DCGM operational issues. Queries Netdata via MCP for NVIDIA DCGM health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with NVIDIA DCGM: hbm degradation, thermal runaway/throttling, nvlink errors, gpu hang (xid 13/31/43/79), or silent performance degradation. Queries Netdata via MCP for NVIDIA DCGM health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -15,6 +15,28 @@ tags:
 
 ## When to use this skill
 
+- **HBM Degradation**: Progressive ECC errors then row remapping then spare row exhaustion then
+                       uncorrectable errors then GPU falls off bus. This is the #1 hardware failure
+                       mode. It's slow-moving (weeks to months) and completely predictable if you
+                       monitor the right signals.
+- **Thermal Runaway/Throttling**: Inlet temperature rises then GPU thermal throttles then clocks
+                                  drop then training slows then other GPUs wait at synchronization
+                                  barriers then all GPUs run sub-optimally because one is throttled.
+- **NVLink Errors**: CRC errors on NVLink lanes then retransmissions then bandwidth reduction then
+                     collective operations slow down then multi-GPU training stalls or hangs. Often
+                     caused by cable issues, connector problems, or NVSwitch failures.
+- **GPU Hang (XID 13/31/43/79)**: GPU firmware or hardware enters an unrecoverable state. Manifests
+                                  as processes stuck, CUDA calls not returning, eventually XID error
+                                  in dmesg. The GPU may need a reset or the node needs a reboot. XID
+                                  79 ("GPU has fallen off the bus") means the PCIe link is lost
+                                  entirely.
+- **Silent Performance Degradation**: PCIe link running at reduced width (x8 instead of x16) or
+                                      reduced speed (Gen3 instead of Gen5). GPU appears healthy,
+                                      workloads run, but throughput is halved or worse. Operators
+                                      often miss this for weeks.
+- **Power Capping**: Chassis-level power management reduces individual GPU power limits. Clocks
+                     drop. Training throughput drops proportionally. No errors, no alerts; just
+                     slower.
 - Any time the user reports a NVIDIA DCGM service behaving outside its expected envelope (elevated
   errors, latency, saturation, resource exhaustion, or unexpected restarts).
 - An on-call engineer is paging on a Netdata alert tied to a NVIDIA DCGM instance and wants a
@@ -24,6 +46,8 @@ tags:
 
 - This skill wraps the Netdata operator playbook for NVIDIA DCGM. It does not replace the playbook;
   it routes a coding agent through MCP queries against the same signals the playbook relies on.
+- Dominant failure archetypes the playbook calls out: HBM Degradation; Thermal Runaway/Throttling;
+  NVLink Errors; GPU Hang (XID 13/31/43/79); Silent Performance Degradation.
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your NVIDIA DCGM instrumentation adds. Both paths end at the
   same MCP query surface.
@@ -36,9 +60,29 @@ tags:
 2. Pull the last 15 minutes of signals for the target. Use `query_metrics` against the contexts
    listed in the domain rule files. Run `find_anomalous_metrics` in parallel over the same window;
    anomalies frame which rule file to read first.
-3. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
+3. Check for **HBM Degradation**. Progressive ECC errors then row remapping then spare row
+   exhaustion then uncorrectable errors then GPU falls off bus. This is the #1 hardware failure
+   mode. It's slow-moving (weeks to months) and completely predictable if you monitor the right
+   signals. Inspect the rule file whose signals move first for this mode.
+4. Check for **Thermal Runaway/Throttling**. Inlet temperature rises then GPU thermal throttles then
+   clocks drop then training slows then other GPUs wait at synchronization barriers then all GPUs
+   run sub-optimally because one is throttled. Inspect the rule file whose signals move first for
+   this mode.
+5. Check for **NVLink Errors**. CRC errors on NVLink lanes then retransmissions then bandwidth
+   reduction then collective operations slow down then multi-GPU training stalls or hangs. Often
+   caused by cable issues, connector problems, or NVSwitch failures. Inspect the rule file whose
+   signals move first for this mode.
+6. Check for **GPU Hang (XID 13/31/43/79)**. GPU firmware or hardware enters an unrecoverable state.
+   Manifests as processes stuck, CUDA calls not returning, eventually XID error in dmesg. The GPU
+   may need a reset or the node needs a reboot. XID 79 ("GPU has fallen off the bus") means the PCIe
+   link is lost entirely. Inspect the rule file whose signals move first for this mode.
+7. Check for **Silent Performance Degradation**. PCIe link running at reduced width (x8 instead of
+   x16) or reduced speed (Gen3 instead of Gen5). GPU appears healthy, workloads run, but throughput
+   is halved or worse. Operators often miss this for weeks. Inspect the rule file whose signals move
+   first for this mode.
+8. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
    `system.disk.io_time`). Many service-level failures have a host-resource precursor.
-4. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
+9. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
    MCP queries from the Verification section to confirm the signals returned to expected ranges. A
    fix that does not move the signal back is not a fix.
 

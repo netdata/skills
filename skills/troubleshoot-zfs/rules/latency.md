@@ -1,8 +1,8 @@
-# Zfs: LATENCY signals
+# Zfs: Latency signals
 
 ## Scope
 
-Signals in the LATENCY domain for Zfs, as defined in the Netdata operator playbook. Each signal
+Signals in the Latency domain for Zfs, as defined in the Netdata operator playbook. Each signal
 includes a short description, the collection source, and a hint for the MCP query pattern that
 surfaces it. Use this file during a triage pass to decide which signal to pull first.
 

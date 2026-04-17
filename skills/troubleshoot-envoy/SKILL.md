@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-envoy
-description: "Use when diagnosing issues with Envoy: connection pool exhaustion cascade, memory pressure spiral, or xds control plane disconnect. Queries Netdata via MCP for server state, upstream host health, upstream request rate, downstream request rate, upstream request duration, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with Envoy: connection pool exhaustion cascade, memory pressure spiral, xds control plane disconnect, retry amplification, or stats cardinality explosion. Queries Netdata via MCP for server state, upstream host health, upstream request rate, downstream request rate, upstream request duration, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0

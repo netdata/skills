@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-cockroachdb
-description: "Use when diagnosing issues with Cockroachdb: Cockroachdb operational issues. Queries Netdata via MCP for Cockroachdb health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with Cockroachdb: lsm compaction death spiral, raft liveness failure, clock skew crisis, hot range, or intent accumulation. Queries Netdata via MCP for Cockroachdb health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -15,6 +15,21 @@ tags:
 
 ## When to use this skill
 
+- **LSM Compaction Death Spiral**: Writes outpace compaction. L0 sublevel count climbs. Read latency
+                                   goes exponential. Write stalls follow. The node appears "stuck."
+- **Raft Liveness Failure**: A node becomes slow (GC pause, disk stall, CPU saturation), can't
+                             process Raft heartbeats, loses leadership, the cluster redistributes
+                             leases causing cascading unavailability windows.
+- **Clock Skew Crisis**: NTP misconfiguration causes clock drift. Node self-terminates at >80% of
+                         max-offset. If multiple nodes drift (common with shared NTP), quorum is
+                         lost.
+- **Hot Range**: A single range receives disproportionate traffic due to sequential key patterns.
+                 One node bottlenecks the entire workload while others idle.
+- **Intent Accumulation**: Long-running or abandoned transactions leave write intents that block
+                           other transactions, cascading latency across the cluster.
+- **Memory Pressure / GC Thrashing**: Large queries exhaust SQL memory budget. Go GC pauses exceed
+                                      Raft heartbeat interval (3s), causing liveness loss and
+                                      oscillating availability.
 - Any time the user reports a Cockroachdb service behaving outside its expected envelope (elevated
   errors, latency, saturation, resource exhaustion, or unexpected restarts).
 - An on-call engineer is paging on a Netdata alert tied to a Cockroachdb instance and wants a
@@ -28,6 +43,8 @@ tags:
   store. It layers SQL execution on top of a transactional KV engine that uses Raft consensus for
   replication and MVCC for concurrency control. To reason about its failures, you must hold several
   interacting subsystems in your head simultaneously.
+- Dominant failure archetypes the playbook calls out: LSM Compaction Death Spiral; Raft Liveness
+  Failure; Clock Skew Crisis; Hot Range; Intent Accumulation.
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your Cockroachdb instrumentation adds. Both paths end at the
   same MCP query surface.
@@ -40,9 +57,24 @@ tags:
 2. Pull the last 15 minutes of signals for the target. Use `query_metrics` against the contexts
    listed in the domain rule files. Run `find_anomalous_metrics` in parallel over the same window;
    anomalies frame which rule file to read first.
-3. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
+3. Check for **LSM Compaction Death Spiral**. Writes outpace compaction. L0 sublevel count climbs.
+   Read latency goes exponential. Write stalls follow. The node appears "stuck." Inspect the rule
+   file whose signals move first for this mode.
+4. Check for **Raft Liveness Failure**. A node becomes slow (GC pause, disk stall, CPU saturation),
+   can't process Raft heartbeats, loses leadership, the cluster redistributes leases causing
+   cascading unavailability windows. Inspect the rule file whose signals move first for this mode.
+5. Check for **Clock Skew Crisis**. NTP misconfiguration causes clock drift. Node self-terminates at
+   >80% of max-offset. If multiple nodes drift (common with shared NTP), quorum is lost. Inspect the
+   rule file whose signals move first for this mode.
+6. Check for **Hot Range**. A single range receives disproportionate traffic due to sequential key
+   patterns. One node bottlenecks the entire workload while others idle. Inspect the rule file whose
+   signals move first for this mode.
+7. Check for **Intent Accumulation**. Long-running or abandoned transactions leave write intents
+   that block other transactions, cascading latency across the cluster. Inspect the rule file whose
+   signals move first for this mode.
+8. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
    `system.disk.io_time`). Many service-level failures have a host-resource precursor.
-4. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
+9. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
    MCP queries from the Verification section to confirm the signals returned to expected ranges. A
    fix that does not move the signal back is not a fix.
 

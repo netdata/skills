@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-proxysql
-description: "Use when diagnosing issues with Proxysql: Proxysql operational issues. Queries Netdata via MCP for backend server health status, monitor health check results, backend connection pool usage, client connection metrics, questions rate, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with Proxysql: backend connection starvation, multiplexing collapse, monitor false decisions, query rule cpu overload, or configuration drift. Queries Netdata via MCP for backend server health status, monitor health check results, backend connection pool usage, client connection metrics, questions rate, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -15,6 +15,13 @@ tags:
 
 ## When to use this skill
 
+- **Backend Connection Starvation**: Backend pool saturates. New queries queue or timeout.
+- **Multiplexing Collapse**: Too many pinned sessions. Approaches 1:1 client-to-backend ratio.
+- **Monitor False Decisions**: Health checks misconfigured. Backends flap between ONLINE and
+                               SHUNNED.
+- **Query Rule CPU Overload**: Complex regex in `mysql_query_rules` saturates worker threads.
+- **Configuration Drift**: Changes not propagated between RUNTIME/MEMORY/DISK layers.
+- **Cache Stampede**: Hot cache entry expires, thundering herd hits backend.
 - Any time the user reports a Proxysql service behaving outside its expected envelope (elevated
   errors, latency, saturation, resource exhaustion, or unexpected restarts).
 - An on-call engineer is paging on a Netdata alert tied to a Proxysql instance and wants a
@@ -31,6 +38,8 @@ tags:
 - The playbook decomposes Proxysql health into 7 signal domains: Availability & Backend Health,
   Connection Management, Query Performance, Error Tracking, Traffic & Throughput, Resource
   Utilization. Each domain maps to one rule file in this skill.
+- Dominant failure archetypes the playbook calls out: Backend Connection Starvation; Multiplexing
+  Collapse; Monitor False Decisions; Query Rule CPU Overload; Configuration Drift.
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your Proxysql instrumentation adds. Both paths end at the same
   MCP query surface.
@@ -43,9 +52,19 @@ tags:
 2. Pull the last 15 minutes of signals for the target. Use `query_metrics` against the contexts
    listed in the domain rule files. Run `find_anomalous_metrics` in parallel over the same window;
    anomalies frame which rule file to read first.
-3. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
+3. Check for **Backend Connection Starvation**. Backend pool saturates. New queries queue or
+   timeout. Inspect the rule file whose signals move first for this mode.
+4. Check for **Multiplexing Collapse**. Too many pinned sessions. Approaches 1:1 client-to-backend
+   ratio. Inspect the rule file whose signals move first for this mode.
+5. Check for **Monitor False Decisions**. Health checks misconfigured. Backends flap between ONLINE
+   and SHUNNED. Inspect the rule file whose signals move first for this mode.
+6. Check for **Query Rule CPU Overload**. Complex regex in `mysql_query_rules` saturates worker
+   threads. Inspect the rule file whose signals move first for this mode.
+7. Check for **Configuration Drift**. Changes not propagated between RUNTIME/MEMORY/DISK layers.
+   Inspect the rule file whose signals move first for this mode.
+8. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
    `system.disk.io_time`). Many service-level failures have a host-resource precursor.
-4. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
+9. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
    MCP queries from the Verification section to confirm the signals returned to expected ranges. A
    fix that does not move the signal back is not a fix.
 

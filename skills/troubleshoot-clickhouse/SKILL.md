@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-clickhouse
-description: "Use when diagnosing issues with ClickHouse: merge debt spiral, memory exhaustion, or replication lag cascade. Queries Netdata via MCP for server process liveness, replicated table read/write availability, active part count per table, merge activity and progress, insert delays and rejections, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with ClickHouse: merge debt spiral, memory exhaustion, replication lag cascade, zookeeper/keeper saturation, or disk space collapse. Queries Netdata via MCP for server process liveness, replicated table read/write availability, active part count per table, merge activity and progress, insert delays and rejections, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -45,7 +45,7 @@ tags:
   Understanding its internal machinery is essential because its failure modes are distinctive; it
   does not fail like a transactional database.
 - The playbook decomposes ClickHouse health into 11 signal domains: Availability, Internal State;
-  Parts and Merges, Insert Health, Memory, Errors, Disk. Each domain maps to one rule file in this
+  Parts And Merges, Insert Health, Memory, Errors, Disk. Each domain maps to one rule file in this
   skill.
 - Dominant failure archetypes the playbook calls out: Merge Debt Spiral; Memory Exhaustion;
   Replication Lag Cascade; ZooKeeper/Keeper Saturation; Disk Space Collapse.

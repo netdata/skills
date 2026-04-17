@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-vmware-vsphere
-description: "Use when diagnosing issues with VMware vSphere: cpu starvation, memory pressure cascade, or storage latency cliff. Queries Netdata via MCP for cpu ready time (per vm), cpu co-stop (per vm), memory balloon (per vm and host), host swap activity (vmkernel-level swap), datastore latency — davg, kavg, gavg, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with VMware vSphere: cpu starvation, memory pressure cascade, storage latency cliff, numa penalty, or snapshot accumulation. Queries Netdata via MCP for cpu ready time (per vm), cpu co-stop (per vm), memory balloon (per vm and host), host swap activity (vmkernel-level swap), datastore latency; davg, kavg, gavg, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -41,8 +41,8 @@ tags:
   relies on.
 - vSphere is a layered virtualization stack with three interdependent planes that must be understood
   together to reason about failures.
-- The playbook decomposes VMware vSphere health into 8 signal domains: CPU, Memory, Storage,
-  Network, Availability & vCenter Services, Hardware & Host Health. Each domain maps to one rule
+- The playbook decomposes VMware vSphere health into 8 signal domains: Cpu, Memory, Storage,
+  Network, Availability & Vcenter Services, Hardware & Host Health. Each domain maps to one rule
   file in this skill.
 - Dominant failure archetypes the playbook calls out: CPU starvation; Memory pressure cascade;
   Storage latency cliff; NUMA penalty; Snapshot accumulation.

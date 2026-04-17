@@ -14,7 +14,7 @@ that surfaces it. Use this file during a triage pass to decide which signal to p
 
 ## Signals
 
-### Datastore Latency — DAVG, KAVG, GAVG [HIGH]
+### Datastore Latency; DAVG, KAVG, GAVG [HIGH]
 
 Three latency measurements along the storage I/O path: - **GAVG** (Guest Average): Total latency as
 seen by the VM = KAVG + DAVG + queue time. - **KAVG** (Kernel Average): Latency added by the

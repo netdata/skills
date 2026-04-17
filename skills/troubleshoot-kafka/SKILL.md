@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-kafka
-description: "Use when diagnosing issues with Kafka: Kafka operational issues. Queries Netdata via MCP for Kafka health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with Kafka: \"the isr shrinks\", \"the partition goes leaderless\", \"the consumer falls behind\", \"the controller is overwhelmed\", or \"the broker runs out of disk\". Queries Netdata via MCP for Kafka health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -15,6 +15,27 @@ tags:
 
 ## When to use this skill
 
+- **"The ISR shrinks"**: A follower can't keep up (slow disk, network issue, GC pause). ISR shrinks
+                         then if enough followers leave, `min.insync.replicas` (default 1) can't be
+                         satisfied then producers with `acks=all` get `NotEnoughReplicasException`.
+                         Most common degradation mode.
+- **"The partition goes leaderless"**: Leader dies and no ISR member is available. If
+                                       `unclean.leader.election.enable=false` (default since Kafka
+                                       0.11.0.0), the partition is completely unavailable. If
+                                       enabled, a behind follower takes over and data is silently
+                                       lost.
+- **"The consumer falls behind"**: Consumer lag grows because consumers are slow, rebalancing, or
+                                   dead. Eventually the consumer's offset points to data deleted by
+                                   retention then `OffsetOutOfRangeException` then data loss from
+                                   the consumer's perspective.
+- **"The controller is overwhelmed"**: Too many partitions, broker joins/leaves, or ISR changes. The
+                                       controller's event queue backs up. Metadata propagation
+                                       stalls. Requests fail with `NOT_LEADER_FOR_PARTITION`.
+- **"The broker runs out of disk"**: Kafka shuts down the log directory. No graceful degradation.
+                                     Partitions on that directory become unavailable.
+- **"The request queue fills up"**: Network threads accept requests faster than I/O threads process
+                                    them. Queue fills, network threads block, clients time out and
+                                    retry, adding more load (positive feedback loop).
 - Any time the user reports a Kafka service behaving outside its expected envelope (elevated errors,
   latency, saturation, resource exhaustion, or unexpected restarts).
 - An on-call engineer is paging on a Netdata alert tied to a Kafka instance and wants a structured
@@ -24,6 +45,9 @@ tags:
 
 - This skill wraps the Netdata operator playbook for Kafka. It does not replace the playbook; it
   routes a coding agent through MCP queries against the same signals the playbook relies on.
+- Dominant failure archetypes the playbook calls out: "The ISR shrinks"; "The partition goes
+  leaderless"; "The consumer falls behind"; "The controller is overwhelmed"; "The broker runs out of
+  disk".
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your Kafka instrumentation adds. Both paths end at the same MCP
   query surface.
@@ -36,9 +60,27 @@ tags:
 2. Pull the last 15 minutes of signals for the target. Use `query_metrics` against the contexts
    listed in the domain rule files. Run `find_anomalous_metrics` in parallel over the same window;
    anomalies frame which rule file to read first.
-3. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
+3. Check for **"The ISR shrinks"**. A follower can't keep up (slow disk, network issue, GC pause).
+   ISR shrinks then if enough followers leave, `min.insync.replicas` (default 1) can't be satisfied
+   then producers with `acks=all` get `NotEnoughReplicasException`. Most common degradation mode.
+   Inspect the rule file whose signals move first for this mode.
+4. Check for **"The partition goes leaderless"**. Leader dies and no ISR member is available. If
+   `unclean.leader.election.enable=false` (default since Kafka 0.11.0.0), the partition is
+   completely unavailable. If enabled, a behind follower takes over and data is silently lost.
+   Inspect the rule file whose signals move first for this mode.
+5. Check for **"The consumer falls behind"**. Consumer lag grows because consumers are slow,
+   rebalancing, or dead. Eventually the consumer's offset points to data deleted by retention then
+   `OffsetOutOfRangeException` then data loss from the consumer's perspective. Inspect the rule file
+   whose signals move first for this mode.
+6. Check for **"The controller is overwhelmed"**. Too many partitions, broker joins/leaves, or ISR
+   changes. The controller's event queue backs up. Metadata propagation stalls. Requests fail with
+   `NOT_LEADER_FOR_PARTITION`. Inspect the rule file whose signals move first for this mode.
+7. Check for **"The broker runs out of disk"**. Kafka shuts down the log directory. No graceful
+   degradation. Partitions on that directory become unavailable. Inspect the rule file whose signals
+   move first for this mode.
+8. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
    `system.disk.io_time`). Many service-level failures have a host-resource precursor.
-4. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
+9. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
    MCP queries from the Verification section to confirm the signals returned to expected ranges. A
    fix that does not move the signal back is not a fix.
 

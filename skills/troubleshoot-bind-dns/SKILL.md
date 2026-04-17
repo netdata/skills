@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-bind-dns
-description: "Use when diagnosing issues with BIND DNS: recursive client exhaustion, cache pressure spiral, or upstream dependency failure. Queries Netdata via MCP for BIND DNS health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with BIND DNS: recursive client exhaustion, cache pressure spiral, upstream dependency failure, udp packet drops, or zone staleness cascade. Queries Netdata via MCP for BIND DNS health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0

@@ -1,8 +1,8 @@
-# Zfs: RESOURCE UTILIZATION signals
+# Zfs: Resource Utilization signals
 
 ## Scope
 
-Signals in the RESOURCE UTILIZATION domain for Zfs, as defined in the Netdata operator playbook.
+Signals in the Resource Utilization domain for Zfs, as defined in the Netdata operator playbook.
 Each signal includes a short description, the collection source, and a hint for the MCP query
 pattern that surfaces it. Use this file during a triage pass to decide which signal to pull first.
 

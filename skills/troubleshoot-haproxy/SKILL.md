@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-haproxy
-description: "Use when diagnosing issues with HAProxy: connection saturation, backend collapse, or tls resource exhaustion. Queries Netdata via MCP for process liveness, backend server health status, frontend session rate, http request rate, queue time (qtime), applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with HAProxy: connection saturation, backend collapse, tls resource exhaustion, buffer starvation, or reload storms. Queries Netdata via MCP for process liveness, backend server health status, frontend session rate, http request rate, queue time (qtime), applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -51,7 +51,7 @@ tags:
   kernel's most efficient poller (`epoll` on Linux) to multiplex potentially hundreds of thousands
   of concurrent conne...
 - The playbook decomposes HAProxy health into 7 signal domains: Availability, Throughput, Latency,
-  Errors, Saturation, SSL/TLS. Each domain maps to one rule file in this skill.
+  Errors, Saturation, Ssl/Tls. Each domain maps to one rule file in this skill.
 - Dominant failure archetypes the playbook calls out: Connection saturation; Backend collapse; TLS
   resource exhaustion; Buffer starvation; Reload storms.
 - Netdata observes the signals listed in the rule files via its native collectors, plus any

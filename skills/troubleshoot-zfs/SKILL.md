@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-zfs
-description: "Use when diagnosing issues with Zfs: Zfs operational issues. Queries Netdata via MCP for pool health state, per-vdev state and error counts (data-bearing vdevs), pool i/o operations and bandwidth, pool i/o latency, i/o queue depth, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with Zfs: pool state degradation, capacity-fragmentation cliff, txg sync hang, arc memory starvation, or silent data corruption. Queries Netdata via MCP for pool health state, per-vdev state and error counts (data-bearing vdevs), pool i/o operations and bandwidth, pool i/o latency, i/o queue depth, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -15,6 +15,26 @@ tags:
 
 ## When to use this skill
 
+- **Pool state degradation**: A vdev fails then pool DEGRADED then redundancy lost then next failure
+                              = data loss. Pool stays accessible but one failure away from
+                              catastrophe. [HIGH]
+- **Capacity-fragmentation cliff**: Pool fills past ~80% then metaslab allocation switches from
+                                    first-fit to best-fit then write amplification then latency
+                                    spikes then cascading performance collapse. Non-linear;
+                                    performance appears fine until it suddenly isn't. [HIGH]
+- **TXG sync hang**: Storage cannot keep up with dirty data generation then syncing TXG takes too
+                     long then open TXG accumulates unbounded dirty data then write pipeline stalls
+                     then application freezes. Reads from ARC still work; this is specifically a
+                     write freeze. [HIGH]
+- **ARC memory starvation**: ARC consumes too much RAM (no `zfs_arc_max` set or set too high) then
+                             system memory pressure then kernel swaps applications or OOM killer
+                             activates then application crashes unrelated to storage. [HIGH]
+- **Silent data corruption**: Checksum errors detected during scrub or reads. ZFS repairs from
+                              redundancy if available. If no redundancy then data loss. Pool stays
+                              ONLINE; corruption is invisible without scrubs. [HIGH]
+- **ZIL/SLOG bottleneck**: Synchronous write workload saturates SLOG then fsync latency spikes then
+                           database/NFS performance collapses. Pool and read performance appear
+                           normal. [HIGH]
 - Any time the user reports a Zfs service behaving outside its expected envelope (elevated errors,
   latency, saturation, resource exhaustion, or unexpected restarts).
 - An on-call engineer is paging on a Netdata alert tied to a Zfs instance and wants a structured
@@ -24,8 +44,10 @@ tags:
 
 - This skill wraps the Netdata operator playbook for Zfs. It does not replace the playbook; it
   routes a coding agent through MCP queries against the same signals the playbook relies on.
-- The playbook decomposes Zfs health into 6 signal domains: AVAILABILITY, THROUGHPUT, LATENCY,
-  ERRORS, RESOURCE UTILIZATION, INTERNAL STATE. Each domain maps to one rule file in this skill.
+- The playbook decomposes Zfs health into 6 signal domains: Availability, Throughput, Latency,
+  Errors, Resource Utilization, Internal State. Each domain maps to one rule file in this skill.
+- Dominant failure archetypes the playbook calls out: Pool state degradation; Capacity-fragmentation
+  cliff; TXG sync hang; ARC memory starvation; Silent data corruption.
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your Zfs instrumentation adds. Both paths end at the same MCP
   query surface.
@@ -38,9 +60,27 @@ tags:
 2. Pull the last 15 minutes of signals for the target. Use `query_metrics` against the contexts
    listed in the domain rule files. Run `find_anomalous_metrics` in parallel over the same window;
    anomalies frame which rule file to read first.
-3. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
+3. Check for **Pool state degradation**. A vdev fails then pool DEGRADED then redundancy lost then
+   next failure = data loss. Pool stays accessible but one failure away from catastrophe. [HIGH]
+   Inspect the rule file whose signals move first for this mode.
+4. Check for **Capacity-fragmentation cliff**. Pool fills past ~80% then metaslab allocation
+   switches from first-fit to best-fit then write amplification then latency spikes then cascading
+   performance collapse. Non-linear; performance appears fine until it suddenly isn't. [HIGH]
+   Inspect the rule file whose signals move first for this mode.
+5. Check for **TXG sync hang**. Storage cannot keep up with dirty data generation then syncing TXG
+   takes too long then open TXG accumulates unbounded dirty data then write pipeline stalls then
+   application freezes. Reads from ARC still work; this is specifically a write freeze. [HIGH]
+   Inspect the rule file whose signals move first for this mode.
+6. Check for **ARC memory starvation**. ARC consumes too much RAM (no `zfs_arc_max` set or set too
+   high) then system memory pressure then kernel swaps applications or OOM killer activates then
+   application crashes unrelated to storage. [HIGH] Inspect the rule file whose signals move first
+   for this mode.
+7. Check for **Silent data corruption**. Checksum errors detected during scrub or reads. ZFS repairs
+   from redundancy if available. If no redundancy then data loss. Pool stays ONLINE; corruption is
+   invisible without scrubs. [HIGH] Inspect the rule file whose signals move first for this mode.
+8. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
    `system.disk.io_time`). Many service-level failures have a host-resource precursor.
-4. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
+9. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
    MCP queries from the Verification section to confirm the signals returned to expected ranges. A
    fix that does not move the signal back is not a fix.
 

@@ -1,6 +1,6 @@
 ---
 name: troubleshoot-mysql
-description: "Use when diagnosing issues with MySQL: redo log stall, connection exhaustion, or purge lag explosion. Queries Netdata via MCP for mysql server availability, connection utilization, query throughput (questions), slow query rate, active execution queue (threads_running), applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+description: "Use when diagnosing issues with MySQL: redo log stall, connection exhaustion, purge lag explosion, metadata lock cascade, or replication lag spiral. Queries Netdata via MCP for mysql server availability, connection utilization, query throughput (questions), slow query rate, active execution queue (threads_running), applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
 version: 0.1.0
 author: Netdata
 license: Apache-2.0

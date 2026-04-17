@@ -1,8 +1,8 @@
-# RabbitMQ: Overview signals
+# NVMe: Endurance & Wear signals
 
 ## Scope
 
-Signals in the Overview domain for RabbitMQ, as defined in the Netdata operator playbook. Each
+Signals in the Endurance & Wear domain for NVMe, as defined in the Netdata operator playbook. Each
 signal includes a short description, the collection source, and a hint for the MCP query pattern
 that surfaces it. Use this file during a triage pass to decide which signal to pull first.
 
@@ -14,9 +14,28 @@ that surfaces it. Use this file during a triage pass to decide which signal to p
 
 ## Signals
 
-No structured signal list was extracted from the playbook for the Overview domain. Fall back to the
-MCP discovery pattern: run `list_metrics` filtered by the RabbitMQ service and inspect anything with
-matching keywords.
+### Percentage Used (Endurance Consumed) [HIGH]
+
+Vendor-specific estimate of NVMe subsystem life used, based on actual usage and manufacturer's
+prediction (TBW/DWPD rating). Can exceed 100%.
+
+Collection source: NVMe SMART log, `percent_used` field. Netdata context:
+`nvme.device_estimated_endurance_perc`, dimension: `used`.
+
+MCP query: pull this signal with `query_metrics` and check the last 15 to 30 minutes against
+expected bands. Cross-reference with `find_anomalous_metrics` scoped to the same context. Use
+`find_correlated_metrics` if the signal has moved but the obvious cause is not visible.
+
+### Available Spare Capacity [HIGH]
+
+Percentage of remaining spare NAND blocks available for bad block replacement and wear leveling.
+
+Collection source: NVMe SMART log: `avail_spare` (current) and `spare_thresh` (vendor threshold).
+Netdata context: `nvme.device_available_spare_perc`, dimension: `spare`.
+
+MCP query: pull this signal with `query_metrics` and check the last 15 to 30 minutes against
+expected bands. Cross-reference with `find_anomalous_metrics` scoped to the same context. Use
+`find_correlated_metrics` if the signal has moved but the obvious cause is not visible.
 
 ## Triage order within this domain
 
@@ -53,7 +72,7 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
 
 # Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the RabbitMQ service (usually service.name or host.name)
+find_anomalous_metrics filtered by any attribute unique to the NVMe service (usually service.name or host.name)
 
 # Look for correlated signals outside this domain
 find_correlated_metrics around the incident window, limit 15

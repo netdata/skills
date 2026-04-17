@@ -1,10 +1,11 @@
-# NVMe: Overview signals
+# Postfix: Internal State Domain signals
 
 ## Scope
 
-Signals in the Overview domain for NVMe, as defined in the Netdata operator playbook. Each signal
-includes a short description, the collection source, and a hint for the MCP query pattern that
-surfaces it. Use this file during a triage pass to decide which signal to pull first.
+Signals in the Internal State Domain domain for Postfix, as defined in the Netdata operator
+playbook. Each signal includes a short description, the collection source, and a hint for the MCP
+query pattern that surfaces it. Use this file during a triage pass to decide which signal to pull
+first.
 
 ## Severity legend
 
@@ -14,9 +15,25 @@ surfaces it. Use this file during a triage pass to decide which signal to pull f
 
 ## Signals
 
-No structured signal list was extracted from the playbook for the Overview domain. Fall back to the
-MCP discovery pattern: run `list_metrics` filtered by the NVMe service and inspect anything with
-matching keywords.
+### DNS Lookup Success Rate [MED]
+
+Percentage of DNS lookups (MX, A, PTR) succeeding for delivery and verification.
+
+Collection source: Mail log parsing for DNS-related errors or named/query logs.
+
+MCP query: pull this signal with `query_metrics` and check the last 15 to 30 minutes against
+expected bands. Cross-reference with `find_anomalous_metrics` scoped to the same context. Use
+`find_correlated_metrics` if the signal has moved but the obvious cause is not visible.
+
+### TLS Handshake Success Rate [MED]
+
+Percentage of SMTP TLS negotiations completing successfully.
+
+Collection source: Mail log parsing for TLS-related entries.
+
+MCP query: pull this signal with `query_metrics` and check the last 15 to 30 minutes against
+expected bands. Cross-reference with `find_anomalous_metrics` scoped to the same context. Use
+`find_correlated_metrics` if the signal has moved but the obvious cause is not visible.
 
 ## Triage order within this domain
 
@@ -53,7 +70,7 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
 
 # Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the NVMe service (usually service.name or host.name)
+find_anomalous_metrics filtered by any attribute unique to the Postfix service (usually service.name or host.name)
 
 # Look for correlated signals outside this domain
 find_correlated_metrics around the incident window, limit 15

@@ -68,10 +68,21 @@ A batch of 10 prompts takes about 20 minutes per client.
 
 ### Protocol (semi-automated)
 
-With the Netdata Cloud MCP connected to a reviewer's agent, the
-reviewer can feed each prompt and ask the agent to name the skill
-it would load. Record pass/fail per row, then fix descriptions for
-any persistent miss.
+Run
+
+```bash
+python tests/eval/run-description-eval.py
+```
+
+to dump the current skill index and prompt list to a tempdir and
+print a paste-ready prompt. Paste that prompt into a fresh Claude
+Code, Cursor, Codex, or Gemini CLI session and collect the JSON
+match report. Copy the resulting file to
+[`eval/LAST_EVAL_RESULTS.json`](./eval/LAST_EVAL_RESULTS.json) for
+the record.
+
+The last-recorded run is checked in; diff against it after any
+description edits to catch regressions.
 
 ### What to do on a trigger miss
 

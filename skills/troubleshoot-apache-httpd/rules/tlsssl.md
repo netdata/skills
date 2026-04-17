@@ -1,8 +1,8 @@
-# Apache HTTPD: TLS/SSL signals
+# Apache HTTPD: Tls/Ssl signals
 
 ## Scope
 
-Signals in the TLS/SSL domain for Apache HTTPD, as defined in the Netdata operator playbook. Each
+Signals in the Tls/Ssl domain for Apache HTTPD, as defined in the Netdata operator playbook. Each
 signal includes a short description, the collection source, and a hint for the MCP query pattern
 that surfaces it. Use this file during a triage pass to decide which signal to pull first.
 
