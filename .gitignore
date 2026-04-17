@@ -1,0 +1,15 @@
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+.env
+.env.local
+dist/
+build/
+.idea/
+.vscode/
+# Defensive: never commit reference material even if accidentally placed here
+_reference/
+/reference/

@@ -1,0 +1,45 @@
+name: E2E
+
+on:
+  push:
+    branches: [master, main]
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  e2e-nodejs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install python helpers
+        run: pip install requests pyyaml
+
+      - name: Run Node.js E2E
+        run: bash tests/e2e/run-e2e.sh nodejs
+
+      - name: Collect Netdata logs on failure
+        if: failure()
+        run: |
+          cd tests/e2e
+          docker compose logs netdata > netdata.log || true
+          cat netdata.log
+
+      - name: Upload Netdata logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: netdata-logs
+          path: tests/e2e/netdata.log
