@@ -1,6 +1,19 @@
 #!/usr/bin/env bash
 # End-to-end test: Netdata container + instrumented sample app + MCP probe.
 #
+# Usage:
+#   run-e2e.sh nodejs|python            # local-agent MCP verify
+#   run-e2e.sh nodejs|python cloud      # also claim to Cloud + verify
+#                                       # there (requires env vars)
+#
+# Cloud-mode env vars (all required for `cloud`):
+#   NETDATA_CLAIM_TOKEN        claim token from the target space
+#   NETDATA_CLAIM_ROOMS        comma-separated room IDs
+#   NETDATA_CLOUD_API_TOKEN    bearer token for the Cloud MCP probe
+# Optional:
+#   NETDATA_CLAIM_URL          default https://app.netdata.cloud
+#   NETDATA_CLOUD_MCP_URL      default https://app.netdata.cloud/api/v1/mcp
+#
 # Host port overrides (see tests/e2e/README.md):
 #   19998 -> Netdata dashboard+MCP  (container 19999)
 #   4317  -> OTLP gRPC              (same inside container)
@@ -9,7 +22,16 @@
 set -euo pipefail
 
 LANG_=${1:-nodejs}
+MODE=${2:-local}
 cd "$(dirname "$0")"
+
+if [ "$MODE" = "cloud" ]; then
+  : "${NETDATA_CLAIM_TOKEN:?set NETDATA_CLAIM_TOKEN to run cloud mode}"
+  : "${NETDATA_CLAIM_ROOMS:?set NETDATA_CLAIM_ROOMS to run cloud mode}"
+  : "${NETDATA_CLOUD_API_TOKEN:?set NETDATA_CLOUD_API_TOKEN to run cloud mode}"
+  export NETDATA_CLAIM_TOKEN NETDATA_CLAIM_ROOMS
+  export NETDATA_CLAIM_URL="${NETDATA_CLAIM_URL:-https://app.netdata.cloud}"
+fi
 
 NETDATA_URL=http://localhost:19998
 APP_URL=http://localhost:8088/hello
@@ -108,8 +130,16 @@ bash traffic.sh 30 "$APP_URL"
 echo "[e2e] waiting 15 seconds for batch export..."
 sleep 15
 
-echo "[e2e] verifying metrics arrived..."
+echo "[e2e] verifying metrics arrived (local Agent MCP)..."
 python3 verify-metrics.py --app="$LANG_" --url="$NETDATA_URL"
+
+if [ "$MODE" = "cloud" ]; then
+  SERVICE_NAME="hello-$LANG_"
+  echo "[e2e] waiting 45 seconds for Cloud stream + aggregation..."
+  sleep 45
+  echo "[e2e] verifying metrics arrived in Netdata Cloud..."
+  python3 verify-metrics-cloud.py --service="$SERVICE_NAME"
+fi
 
 echo "[e2e] =================================================="
 echo "[e2e] PASS"

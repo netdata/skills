@@ -24,6 +24,13 @@ services:
       - /sys:/host/sys:ro
     environment:
       - DO_NOT_TRACK=1
+      # Optional Cloud claim: only the `cloud` target in run-e2e.sh
+      # supplies non-empty values for these. When set, the Agent
+      # claims into a Netdata Cloud space on startup and streams
+      # metrics to Cloud in addition to serving the local MCP.
+      - NETDATA_CLAIM_TOKEN=${NETDATA_CLAIM_TOKEN:-}
+      - NETDATA_CLAIM_ROOMS=${NETDATA_CLAIM_ROOMS:-}
+      - NETDATA_CLAIM_URL=${NETDATA_CLAIM_URL:-https://app.netdata.cloud}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:19999/api/v1/info"]
       interval: 5s

@@ -47,6 +47,27 @@ bash tests/e2e/run-e2e.sh nodejs
 bash tests/e2e/run-e2e.sh python
 ```
 
+Add a second argument to also verify the metric arrived in Netdata
+Cloud:
+
+```bash
+bash tests/e2e/run-e2e.sh nodejs cloud
+```
+
+Cloud mode requires three environment variables:
+
+- `NETDATA_CLAIM_TOKEN`     claim token from the target Cloud space
+- `NETDATA_CLAIM_ROOMS`     comma-separated room IDs
+- `NETDATA_CLOUD_API_TOKEN` bearer token for the Cloud MCP probe
+
+Optional: `NETDATA_CLAIM_URL` (default `https://app.netdata.cloud`)
+and `NETDATA_CLOUD_MCP_URL` (default
+`https://app.netdata.cloud/api/v1/mcp`).
+
+The Cloud probe pauses 45 seconds after local verification to let
+the Agent stream + Cloud aggregate, then queries the Cloud MCP with
+the same `list_metrics q-filter` pattern used locally.
+
 The script is trap-safe: it stops the sample app and tears down the
 Docker container on exit, even on failure.
 
@@ -91,7 +112,8 @@ tests/e2e/
 │       ├── instrument.py     # must match skills/netdata-instrumentation/rules/python.md
 │       └── app.py            # minimal Flask /hello handler
 ├── traffic.sh                # curl loop
-├── verify-metrics.py         # MCP + REST probe
+├── verify-metrics.py         # local Agent MCP + REST probe
+├── verify-metrics-cloud.py   # Netdata Cloud MCP probe (cloud mode)
 ├── run-e2e.sh                # orchestrator
 └── .gitignore                # node_modules, .venv, etc.
 ```
