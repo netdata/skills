@@ -230,15 +230,23 @@ def fmt_skill_md(
     triggers_lines: list[str] = []
     if failures:
         for title, body in failures[:6]:
-            triggers_lines.append(f"- **{title}**: {trim(body, 280)}")
+            triggers_lines.append(
+                wrap_line(f"- **{title}**: ", trim(body, 280))
+            )
     triggers_lines.append(
-        f"- Any time the user reports a {tech} service behaving outside "
-        "its expected envelope (elevated errors, latency, saturation, "
-        "resource exhaustion, or unexpected restarts)."
+        wrap_line(
+            "- ",
+            f"Any time the user reports a {tech} service behaving outside "
+            "its expected envelope (elevated errors, latency, saturation, "
+            "resource exhaustion, or unexpected restarts).",
+        )
     )
     triggers_lines.append(
-        f"- An on-call engineer is paging on a Netdata alert tied to a "
-        f"{tech} instance and wants a structured triage path."
+        wrap_line(
+            "- ",
+            f"An on-call engineer is paging on a Netdata alert tied to a "
+            f"{tech} instance and wants a structured triage path.",
+        )
     )
 
     # Key facts: architecture summary + more body.
@@ -274,58 +282,97 @@ def fmt_skill_md(
     )
 
     # Step by step: use failure archetypes as ordered triage.
+    def _step(idx: int, body: str) -> str:
+        return wrap_line(f"{idx}. ", body)
+
     steps_lines = []
     steps_lines.append(
-        f"1. Confirm the {tech} service is up. Query Netdata via MCP "
-        "with `list_nodes` and filter by the host running the target. A "
-        "missing node means the symptom is at the network or orchestrator "
-        "layer, not inside the service."
+        _step(
+            1,
+            f"Confirm the {tech} service is up. Query Netdata via MCP "
+            "with `list_nodes` and filter by the host running the target. "
+            "A missing node means the symptom is at the network or "
+            "orchestrator layer, not inside the service.",
+        )
     )
     steps_lines.append(
-        "2. Pull the last 15 minutes of signals for the target. Use "
-        "`query_metrics` against the contexts listed in the domain rule "
-        "files. Run `find_anomalous_metrics` in parallel over the same "
-        "window; anomalies frame which rule file to read first."
+        _step(
+            2,
+            "Pull the last 15 minutes of signals for the target. Use "
+            "`query_metrics` against the contexts listed in the domain "
+            "rule files. Run `find_anomalous_metrics` in parallel over "
+            "the same window; anomalies frame which rule file to read "
+            "first.",
+        )
     )
     for idx, (title, body) in enumerate(failures[:5], start=3):
         steps_lines.append(
-            f"{idx}. Check for **{title}**. {trim(body, 400)} "
-            "Inspect the rule file whose signals move first for this mode."
+            _step(
+                idx,
+                f"Check for **{title}**. {trim(body, 400)} "
+                "Inspect the rule file whose signals move first for "
+                "this mode.",
+            )
         )
     next_idx = len(steps_lines) + 1
     steps_lines.append(
-        f"{next_idx}. Correlate with host-level signals "
-        "(`system.cpu.utilization`, `system.memory.usage`, "
-        "`system.disk.io_time`). Many service-level failures have a "
-        "host-resource precursor."
+        _step(
+            next_idx,
+            "Correlate with host-level signals "
+            "(`system.cpu.utilization`, `system.memory.usage`, "
+            "`system.disk.io_time`). Many service-level failures have a "
+            "host-resource precursor.",
+        )
     )
     steps_lines.append(
-        f"{next_idx + 1}. Apply the remediation hinted at in the "
-        "matching rule file or the operator playbook. Re-run the MCP "
-        "queries from the Verification section to confirm the signals "
-        "returned to expected ranges. A fix that does not move the "
-        "signal back is not a fix."
+        _step(
+            next_idx + 1,
+            "Apply the remediation hinted at in the matching rule file "
+            "or the operator playbook. Re-run the MCP queries from the "
+            "Verification section to confirm the signals returned to "
+            "expected ranges. A fix that does not move the signal back "
+            "is not a fix.",
+        )
     )
     steps_block = "\n".join(steps_lines)
 
     # Common mistakes.
     mistakes_lines = [
-        f"- Treating {tech} as a generic HTTP or process health check. "
-        f"{tech} has specific failure archetypes (see Key facts) that "
-        "generic checks miss.",
-        "- Stopping at the first anomalous metric. Several archetypes "
-        "produce correlated spikes; use `find_correlated_metrics` to "
-        "widen the search before concluding a root cause.",
-        "- Quoting percentile latency without the sample count. Low "
-        "traffic plus a single slow request moves p99 by seconds.",
-        "- Reading dashboards for a window shorter than the failure's "
-        "fingerprint. Slow-brew failures (queue growth, bloat, memory "
-        "fragmentation) need 30+ minutes of data to see the trend.",
-        "- Skipping the host-level correlation. A process-level fix for "
-        "a noisy-neighbour problem does not hold.",
-        "- Assuming alert thresholds are tuned for your workload. Tune "
-        f"against observed {tech} traffic before escalating an alert "
-        "configuration issue.",
+        wrap_line(
+            "- ",
+            f"Treating {tech} as a generic HTTP or process health check. "
+            f"{tech} has specific failure archetypes (see Key facts) that "
+            "generic checks miss.",
+        ),
+        wrap_line(
+            "- ",
+            "Stopping at the first anomalous metric. Several archetypes "
+            "produce correlated spikes; use `find_correlated_metrics` to "
+            "widen the search before concluding a root cause.",
+        ),
+        wrap_line(
+            "- ",
+            "Quoting percentile latency without the sample count. Low "
+            "traffic plus a single slow request moves p99 by seconds.",
+        ),
+        wrap_line(
+            "- ",
+            "Reading dashboards for a window shorter than the failure's "
+            "fingerprint. Slow-brew failures (queue growth, bloat, "
+            "memory fragmentation) need 30+ minutes of data to see the "
+            "trend.",
+        ),
+        wrap_line(
+            "- ",
+            "Skipping the host-level correlation. A process-level fix "
+            "for a noisy-neighbour problem does not hold.",
+        ),
+        wrap_line(
+            "- ",
+            "Assuming alert thresholds are tuned for your workload. "
+            f"Tune against observed {tech} traffic before escalating an "
+            "alert configuration issue.",
+        ),
     ]
     mistakes_block = "\n".join(mistakes_lines)
 
@@ -338,24 +385,28 @@ def fmt_skill_md(
         "  - the specific signals listed in the domain rule files"
     )
 
-    verification_block = (
+    verification_intro = wrap_plain(
         f"Run these MCP queries against the Netdata instance that sees "
-        f"the {tech} service:\n\n"
-        "```text\n"
-        f"1. list_metrics filtered by the {tech} service's context "
-        "prefix.\n"
-        "2. query_metrics for the key signals from the first-triggered "
-        "domain over the last 30 minutes.\n"
-        "3. find_anomalous_metrics scoped to the same service/time "
-        "window.\n"
-        "```\n\n"
-        "Signals the playbook considers load-bearing:\n\n"
-        f"{metric_bullets}\n\n"
+        f"the {tech} service:"
+    )
+    verification_body = wrap_plain(
         "A clean result means every key signal is within its expected "
         "band and the `find_anomalous_metrics` list is empty or contains "
         "only already-acknowledged items. If the fix was real, "
         "re-running the same queries 10 minutes after applying it will "
         "show a clean result. If it does not, revert and look deeper."
+    )
+    verification_block = (
+        f"{verification_intro}\n\n"
+        "```text\n"
+        f"1. list_metrics filtered by the {tech} service's context prefix.\n"
+        "2. query_metrics for the key signals from the first-triggered domain "
+        "over the last 30 minutes.\n"
+        "3. find_anomalous_metrics scoped to the same service/time window.\n"
+        "```\n\n"
+        "Signals the playbook considers load-bearing:\n\n"
+        f"{metric_bullets}\n\n"
+        f"{verification_body}"
     )
 
     # References: one per domain file.
@@ -387,13 +438,59 @@ def fmt_skill_md(
         "```\n"
     )
 
+    key_facts_block = "\n".join(wrap_line("- ", f) for f in key_facts)
+
+    fix_misdiagnosis_intro = wrap_plain(
+        f"If signals drift back into the anomalous range within 30 "
+        f"minutes of a remediation, the cause was deeper than the "
+        f"applied change. Typical misdiagnoses for {tech}:"
+    )
+    fix_misdiagnosis_bullets = "\n".join([
+        wrap_line(
+            "- ",
+            "Host-resource pressure masquerading as application bug.",
+        ),
+        wrap_line(
+            "- ",
+            "Dependent service (DB, cache, upstream) causing a "
+            "secondary symptom in the instrumented service.",
+        ),
+        wrap_line(
+            "- ",
+            "Configuration change that was never reloaded (some "
+            "subsystems only pick up config on full restart).",
+        ),
+    ])
+    fix_escalation = wrap_plain(
+        "Escalate by widening the query window: 2-6 hours instead of "
+        "15 minutes. Slow-moving causes are invisible at triage window "
+        "sizes."
+    )
+
+    references_extra = "\n".join([
+        wrap_line(
+            "- ",
+            "Netdata operator playbook: the authoritative source "
+            "material this skill summarizes.",
+        ),
+        wrap_line(
+            "- ",
+            "`skills/netdata-mcp-integration/` for the transport setup.",
+        ),
+        wrap_line(
+            "- ",
+            "`skills/netdata-otel-setup/` if additional application "
+            "signals are needed beyond what Netdata collects natively.",
+        ),
+    ])
+
     body = (
         f"# Troubleshoot {tech}\n\n"
         "## When to use this skill\n\n"
         + "\n".join(triggers_lines)
         + "\n\n"
         "## Key facts\n\n"
-        + "\n".join(f"- {f}" for f in key_facts)
+        + key_facts_block
         + "\n\n"
         "## Step-by-step\n\n"
         + steps_block
@@ -407,22 +504,17 @@ def fmt_skill_md(
         + verification_block
         + "\n\n"
         "### When the fix does not hold\n\n"
-        f"If signals drift back into the anomalous range within 30 "
-        f"minutes of a remediation, the cause was deeper than the "
-        f"applied change. Typical misdiagnoses for {tech}:\n\n"
-        "- Host-resource pressure masquerading as application bug.\n"
-        "- Dependent service (DB, cache, upstream) causing a secondary "
-        "symptom in the instrumented service.\n"
-        "- Configuration change that was never reloaded (some subsystems "
-        "only pick up config on full restart).\n\n"
-        "Escalate by widening the query window: 2-6 hours instead of 15 "
-        "minutes. Slow-moving causes are invisible at triage window "
-        "sizes.\n\n"
+        + fix_misdiagnosis_intro
+        + "\n\n"
+        + fix_misdiagnosis_bullets
+        + "\n\n"
+        + fix_escalation
+        + "\n\n"
         "## References\n\n"
         + ref_block
-        + "\n- Netdata operator playbook: the authoritative source material this skill summarizes.\n"
-        + "- `skills/netdata-mcp-integration/` for the transport setup.\n"
-        + "- `skills/netdata-otel-setup/` if additional application signals are needed beyond what Netdata collects natively.\n"
+        + "\n"
+        + references_extra
+        + "\n"
     )
     return fm + "\n\n" + body
 
@@ -472,13 +564,13 @@ def fmt_domain_rule(
     lines.append("")
     lines.append("## Scope")
     lines.append("")
-    lines.append(
+    lines.append(wrap_plain(
         f"Signals in the {domain_name} domain for {tech}, as defined in "
         "the Netdata operator playbook. Each signal includes a short "
         "description, the collection source, and a hint for the MCP "
         "query pattern that surfaces it. Use this file during a triage "
         "pass to decide which signal to pull first."
-    )
+    ))
     lines.append("")
     lines.append("## Severity legend")
     lines.append("")
@@ -493,85 +585,88 @@ def fmt_domain_rule(
             lines.append(f"### {sig_name} [{sev}]")
             lines.append("")
             if blurb:
-                lines.append(trim(blurb, 500))
+                lines.append(wrap_plain(trim(blurb, 500)))
             else:
-                lines.append(
+                lines.append(wrap_plain(
                     f"See the {tech} operator playbook for the full "
                     "definition of this signal."
-                )
+                ))
             lines.append("")
             if source:
-                lines.append(f"Collection source: {trim(source, 300)}")
+                lines.append(wrap_plain(
+                    f"Collection source: {trim(source, 300)}"
+                ))
                 lines.append("")
-            lines.append(
+            lines.append(wrap_plain(
                 "MCP query: pull this signal with `query_metrics` and "
                 "check the last 15 to 30 minutes against expected bands. "
                 "Cross-reference with `find_anomalous_metrics` scoped to "
                 "the same context. Use `find_correlated_metrics` if the "
                 "signal has moved but the obvious cause is not visible."
-            )
+            ))
             lines.append("")
     else:
-        lines.append("No structured signal list was extracted from the playbook")
-        lines.append(f"for the {domain_name} domain. Fall back to the MCP")
-        lines.append(
+        lines.append(wrap_plain(
+            f"No structured signal list was extracted from the playbook "
+            f"for the {domain_name} domain. Fall back to the MCP "
             "discovery pattern: run `list_metrics` filtered by the "
             f"{tech} service and inspect anything with matching keywords."
-        )
+        ))
         lines.append("")
 
     lines.append("## Triage order within this domain")
     lines.append("")
-    lines.append(
-        "Investigate HIGH-severity signals first, then MEDIUM, then LOW. "
-        "HIGH-severity signals have the shortest time to impact; a "
-        "confirmed HIGH anomaly usually justifies paging. When two HIGH "
-        "signals move together, treat them as one incident until "
+    lines.append(wrap_plain(
+        "Investigate HIGH-severity signals first, then MEDIUM, then "
+        "LOW. HIGH-severity signals have the shortest time to impact; "
+        "a confirmed HIGH anomaly usually justifies paging. When two "
+        "HIGH signals move together, treat them as one incident until "
         "`find_correlated_metrics` rules out shared cause."
-    )
+    ))
     lines.append("")
     lines.append("## Common false positives")
     lines.append("")
-    lines.append(
-        "- A single stale data point from a collector restart triggers "
+    lines.append(wrap_line("- ",
+        "A single stale data point from a collector restart triggers "
         "many signals briefly. Re-query after 30 seconds before "
         "escalating."
-    )
-    lines.append(
-        "- Short bursts under 60 seconds rarely warrant action unless "
+    ))
+    lines.append(wrap_line("- ",
+        "Short bursts under 60 seconds rarely warrant action unless "
         "paired with a confirmed business impact."
-    )
-    lines.append(
-        "- Comparing against yesterday's baseline on a post-deploy day "
+    ))
+    lines.append(wrap_line("- ",
+        "Comparing against yesterday's baseline on a post-deploy day "
         "produces false anomalies. Compare against the pre-deploy "
         "baseline."
-    )
-    lines.append(
-        "- Collector-visible percentile latency with < 100 samples per "
+    ))
+    lines.append(wrap_line("- ",
+        "Collector-visible percentile latency with < 100 samples per "
         "minute is noise. Require a minimum sample count before acting."
-    )
+    ))
     lines.append("")
     lines.append("## Remediation pointers")
     lines.append("")
-    lines.append(
+    lines.append(wrap_plain(
         "Remediation for signals in this domain is tech-specific and "
         "typically covered in the operator playbook's SECTION 3 "
         "(Failure Patterns) or SECTION 4 (Runbooks). Before applying a "
         "change:"
-    )
+    ))
     lines.append("")
-    lines.append(
-        "1. Run the MCP verification queries to record the current state."
-    )
-    lines.append(
-        "2. Apply the smallest remediation that addresses the confirmed "
-        "cause. Config changes before restarts; restarts before rollbacks."
-    )
-    lines.append(
-        "3. Re-run the same MCP queries after the remediation settles. "
+    lines.append(wrap_line("1. ",
+        "Run the MCP verification queries to record the current state."
+    ))
+    lines.append(wrap_line("2. ",
+        "Apply the smallest remediation that addresses the confirmed "
+        "cause. Config changes before restarts; restarts before "
+        "rollbacks."
+    ))
+    lines.append(wrap_line("3. ",
+        "Re-run the same MCP queries after the remediation settles. "
         "Recording before/after numbers is how a runbook entry gets "
         "sharpened over time."
-    )
+    ))
     lines.append("")
 
     lines.append("## MCP query examples for this domain")
@@ -579,7 +674,7 @@ def fmt_domain_rule(
     lines.append("```text")
     lines.append("# Pull every signal in this domain at once")
     lines.append(
-        f"query_metrics with contexts=[<signals from the list above>] "
+        "query_metrics with contexts=[<signals from the list above>] "
         "and relative_window=-30m"
     )
     lines.append("")
@@ -597,26 +692,27 @@ def fmt_domain_rule(
     lines.append("")
     lines.append("## When to escalate out of this skill")
     lines.append("")
-    lines.append(
-        "If none of the signals in this domain move during the incident, "
-        "the root cause is elsewhere. Typical re-routing:"
-    )
+    lines.append(wrap_plain(
+        "If none of the signals in this domain move during the "
+        "incident, the root cause is elsewhere. Typical re-routing:"
+    ))
     lines.append("")
-    lines.append(
-        "- Host-resource domain: load, CPU, memory, disk, network saturation"
-    )
-    lines.append(
-        "- Dependency domain: the service's upstream or downstream "
+    lines.append(wrap_line("- ",
+        "Host-resource domain: load, CPU, memory, disk, network "
+        "saturation"
+    ))
+    lines.append(wrap_line("- ",
+        "Dependency domain: the service's upstream or downstream "
         "(database, cache, queue) is the actual source"
-    )
-    lines.append(
-        "- Orchestrator domain: Kubernetes or systemd lifecycle events "
+    ))
+    lines.append(wrap_line("- ",
+        "Orchestrator domain: Kubernetes or systemd lifecycle events "
         "rather than application misbehavior"
-    )
-    lines.append(
-        "- Alert engine domain: a misconfigured alert threshold triggered "
+    ))
+    lines.append(wrap_line("- ",
+        "Alert engine domain: a misconfigured alert threshold triggered "
         "a false-positive incident"
-    )
+    ))
     lines.append("")
 
     return "\n".join(lines)
@@ -646,6 +742,33 @@ def trim(s: str, n: int) -> str:
     if len(s) <= n:
         return s
     return s[: n - 3].rstrip() + "..."
+
+
+def wrap_line(prefix: str, body: str, width: int = 100) -> str:
+    """Wrap `prefix + body` so every line stays <= width. Continuation lines
+    are indented by the visual width of the prefix so Markdown list rendering
+    is preserved (bullet and numbered lists both recognize hanging indent)."""
+    body = sanitize(body)
+    indent = " " * len(prefix)
+    return textwrap.fill(
+        prefix + body,
+        width=width,
+        break_long_words=False,
+        break_on_hyphens=False,
+        initial_indent="",
+        subsequent_indent=indent,
+    )
+
+
+def wrap_plain(body: str, width: int = 100) -> str:
+    """Wrap a standalone paragraph at `width` characters."""
+    body = sanitize(body)
+    return textwrap.fill(
+        body,
+        width=width,
+        break_long_words=False,
+        break_on_hyphens=False,
+    )
 
 
 def write_if_changed(path: pathlib.Path, content: str) -> None:
