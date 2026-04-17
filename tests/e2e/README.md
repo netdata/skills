@@ -58,13 +58,21 @@ Docker container on exit, even on failure.
    from `/var/lib/netdata/mcp_dev_preview_api_key`.
 2. Call `initialize` → `tools/list` → `tools/call list_metrics` via
    HTTP-streamable JSON-RPC at `http://localhost:19998/mcp`.
-3. Look for the sample app's `service.name` in the response.
+3. Invoke `list_metrics` with `{"metrics": "*", "nodes": "*", "q": <service-name>}`.
+   Netdata enters SEARCH mode when `q` is set and includes labels,
+   instances, and dimensions in the response (see
+   `_reference/netdata/src/web/mcp/mcp-tools-list-metadata.c:503-506`).
+   The OTel `service.name` attribute rides through as an instance
+   label.
+4. Parse the JSON-encoded `result.content[0].text` payload and count
+   matched contexts. Any non-zero count confirms metadata matching
+   the service name exists on the Netdata side.
 
-If MCP path fails (connection error, unexpected shape), the script
-falls back to Netdata's REST `/api/v2/contexts`. The fallback is
-marked with a `TODO` in-code; the preference is MCP because that is
-what the skill teaches. REST is the safety net so transient MCP
-quirks do not gate the release.
+If the MCP path fails (connection error, unparsable payload, zero
+matches), the script falls back to Netdata's REST `/api/v2/contexts`.
+REST is the safety net so transient MCP quirks do not gate the
+release, but the MCP path is what the skill teaches and what CI
+should report on.
 
 ## Layout
 

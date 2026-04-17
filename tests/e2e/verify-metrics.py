@@ -13,12 +13,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
 from typing import Any
 import urllib.request
 import urllib.error
+
+DEBUG = os.environ.get("E2E_VERIFY_DEBUG") == "1"
 
 DEFAULT_NETDATA_URL = "http://localhost:19998"
 DEFAULT_APP_TARGETS = {
@@ -112,7 +115,11 @@ def try_mcp_verification(netdata_url: str, service_name: str) -> tuple[bool, str
     if len(tools) < 10:
         return False, f"expected 10+ MCP tools, saw {len(tools)}"
 
-    # 3. tools/call list_metrics
+    # 3. tools/call list_metrics with the service name as a full-text
+    # query. Netdata enters SEARCH mode when `q` is set and expands the
+    # response to include labels, instances, and dimensions, which is
+    # where the OTel `service.name` attribute lands. Without `q`, the
+    # default response carries only context names.
     try:
         r = http_post_json(
             mcp_url,
@@ -120,22 +127,73 @@ def try_mcp_verification(netdata_url: str, service_name: str) -> tuple[bool, str
                 "jsonrpc": "2.0",
                 "id": 3,
                 "method": "tools/call",
-                "params": {"name": "list_metrics", "arguments": {}},
+                "params": {
+                    "name": "list_metrics",
+                    "arguments": {
+                        "metrics": "*",
+                        "q": service_name,
+                    },
+                },
             },
             headers,
         )
     except Exception as e:
         return False, f"MCP list_metrics failed: {e}"
 
-    # The response shape is implementation-specific; look for the service
-    # name or at least one sample-app-emitted metric context.
-    blob = json.dumps(r)
-    if service_name in blob:
-        return True, f"service '{service_name}' visible via MCP list_metrics"
+    if "error" in r:
+        return False, f"MCP list_metrics returned error: {r['error']}"
+
+    if DEBUG:
+        print("[verify][debug] raw MCP list_metrics response:")
+        print(json.dumps(r, indent=2)[:4000])
+
+    payload = _extract_text_payload(r)
+    if payload is None:
+        snippet = json.dumps(r)[:400]
+        return False, f"MCP list_metrics response had no parsable text content: {snippet}"
+
+    match_count = _count_context_matches(payload)
+    if match_count > 0:
+        return True, (
+            f"service '{service_name}' matched {match_count} metric "
+            f"context(s) via MCP list_metrics q-filter"
+        )
     return False, (
-        f"MCP list_metrics returned, but service '{service_name}' not "
-        f"visible. Response snippet: {blob[:400]}"
+        f"MCP list_metrics q-filter returned zero matches for "
+        f"'{service_name}' (payload keys: {sorted(payload.keys()) if isinstance(payload, dict) else type(payload).__name__})"
     )
+
+
+def _extract_text_payload(resp: dict[str, Any]) -> Any:
+    """Parse the JSON-encoded text blob carried inside an MCP tools/call result."""
+    content = resp.get("result", {}).get("content") or []
+    if not isinstance(content, list) or not content:
+        return None
+    first = content[0]
+    if not isinstance(first, dict):
+        return None
+    text = first.get("text")
+    if not isinstance(text, str):
+        return None
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return None
+
+
+def _count_context_matches(payload: Any) -> int:
+    """Count context-level matches in a v2-contexts SEARCH payload."""
+    if not isinstance(payload, dict):
+        return 0
+    contexts = payload.get("contexts")
+    if isinstance(contexts, dict):
+        return len(contexts)
+    if isinstance(contexts, list):
+        return len(contexts)
+    nodes = payload.get("nodes")
+    if isinstance(nodes, list):
+        return sum(1 for n in nodes if isinstance(n, dict) and n.get("contexts"))
+    return 0
 
 
 def try_rest_verification(netdata_url: str, service_name: str) -> tuple[bool, str]:
@@ -181,19 +239,18 @@ def verify_with_retries(
 ) -> int:
     last_mcp = last_rest = ""
     for i in range(1, attempts + 1):
-        ok, msg = try_mcp_verification(netdata_url, service_name)
-        last_mcp = msg
+        ok, mcp_msg = try_mcp_verification(netdata_url, service_name)
+        last_mcp = mcp_msg
         if ok:
-            print(f"[verify] MCP PASS ({i}/{attempts}): {msg}")
+            print(f"[verify] MCP PASS ({i}/{attempts}): {mcp_msg}")
             return 0
-        ok, msg = try_rest_verification(netdata_url, service_name)
-        last_rest = msg
+        print(f"[verify] MCP attempt {i}/{attempts}: {mcp_msg}")
+        ok, rest_msg = try_rest_verification(netdata_url, service_name)
+        last_rest = rest_msg
         if ok:
-            print(f"[verify] REST PASS ({i}/{attempts}): {msg}")
-            # TODO: migrate to MCP once the MCP handshake is confirmed stable
-            # in the v0.1 CI environment.
+            print(f"[verify] REST PASS ({i}/{attempts}): {rest_msg}")
             return 0
-        print(f"[verify] attempt {i}/{attempts}: MCP={msg} | REST={msg}")
+        print(f"[verify] REST attempt {i}/{attempts}: {rest_msg}")
         time.sleep(sleep_s)
 
     print(f"[verify] FAIL after {attempts} attempts.")
