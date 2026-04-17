@@ -1,0 +1,22 @@
+{
+  "name": "netdata-skills",
+  "description": "Agent Skills for setting up, instrumenting, and troubleshooting infrastructure with Netdata.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Netdata",
+    "email": "community@netdata.cloud"
+  },
+  "homepage": "https://github.com/netdata/skills",
+  "repository": "https://github.com/netdata/skills",
+  "license": "Apache-2.0",
+  "keywords": [
+    "netdata",
+    "opentelemetry",
+    "otel",
+    "observability",
+    "mcp",
+    "monitoring",
+    "agent-skills",
+    "claude-code"
+  ]
+}
