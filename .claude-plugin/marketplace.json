@@ -1,0 +1,14 @@
+{
+  "name": "netdata-skills",
+  "owner": {
+    "name": "Netdata",
+    "email": "community@netdata.cloud"
+  },
+  "plugins": [
+    {
+      "name": "netdata-skills",
+      "source": "./",
+      "description": "Agent Skills for setting up, instrumenting, and troubleshooting infrastructure with Netdata."
+    }
+  ]
+}

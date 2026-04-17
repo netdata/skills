@@ -13,28 +13,45 @@ Each skill is a pair of files: a `SKILL.md` that the agent loads when a user's r
 
 ## Install
 
-### Claude Code
+The repo ships a `.claude-plugin/plugin.json` manifest and a `.claude-plugin/marketplace.json` declaration, so it installs into Claude Code via the plugin marketplace mechanism with no extra glue.
 
-```bash
+### Claude Code (public install, once the repo is public)
+
+```text
 /plugin marketplace add netdata/skills
-/plugin install netdata-skills
+/plugin install netdata-skills@netdata-skills
 ```
 
-Or manually clone and point Claude Code at the skills directory. Full per-client instructions: [`docs/installation.md`](./docs/installation.md).
+Restart the session (or `/plugin reload`) and the 54 skills activate automatically when a prompt matches a `description`.
 
-### Cursor
+### Claude Code (internal testing, private repo)
+
+If you have access to the private `netdata/skills` repo, clone via SSH and point Claude Code at the local checkout as a marketplace:
 
 ```bash
-git clone https://github.com/netdata/skills ~/.cursor/skills/netdata-skills
+git clone git@github.com:netdata/skills.git ~/netdata-skills
 ```
+
+```text
+/plugin marketplace add ~/netdata-skills
+/plugin install netdata-skills@netdata-skills
+```
+
+Local paths work identically to GitHub URLs for `/plugin marketplace add`. Pull the repo later to pick up changes; run `/plugin marketplace update netdata-skills` to refresh the index.
+
+### Verify the install worked
+
+Start a fresh Claude Code session and paste:
+
+> Set up Netdata to receive OTLP metrics from my services.
+
+The agent should load `netdata-otel-setup` and walk you through `otel.yaml`. If it does, every other skill is reachable the same way.
+
+For a broader round-trip — real Netdata container, real instrumented app, real MCP probe — run `bash tests/e2e/run-e2e.sh nodejs`; green means the skill teaches a working pattern.
 
 ### Other agents
 
-```bash
-npx skills add netdata/skills --all
-```
-
-See [`docs/installation.md`](./docs/installation.md) for the full per-client matrix (Codex, Gemini CLI, Continue, OpenCode).
+The pack is cross-client: `AGENTS.md` at the repo root covers Cursor, Codex, Gemini CLI, Copilot, Zed, Continue.dev, and OpenCode. Per-client paths are in [`docs/installation.md`](./docs/installation.md).
 
 ## Skills
 

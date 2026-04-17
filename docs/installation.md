@@ -4,100 +4,66 @@ Per-client install guides. Pick the one that matches your agent.
 
 ## Claude Code
 
-### Option A: plugin marketplace
+### Option A: plugin marketplace (public repo)
 
-```bash
+```text
 /plugin marketplace add netdata/skills
-/plugin install netdata-skills
+/plugin install netdata-skills@netdata-skills
 ```
 
-The skills are loaded automatically on Claude Code startup.
-
-### Option B: local clone
+### Option B: plugin marketplace (local checkout, for internal testing)
 
 ```bash
-git clone https://github.com/netdata/skills ~/.claude/skills/netdata-skills
+git clone git@github.com:netdata/skills.git ~/netdata-skills
 ```
 
-Claude Code discovers skills under `~/.claude/skills/`.
+```text
+/plugin marketplace add ~/netdata-skills
+/plugin install netdata-skills@netdata-skills
+```
 
-### Option C: project-local
+`/plugin marketplace add` accepts both GitHub slugs and absolute local paths, so the same install flow works against a private checkout.
 
-Clone into the project:
+### Option C: direct skill drop (no plugin system)
+
+Skip the plugin mechanism entirely and drop the skills into Claude Code's global skills directory:
 
 ```bash
-cd your-project
-git clone https://github.com/netdata/skills .claude/skills/netdata-skills
+git clone git@github.com:netdata/skills.git ~/src/netdata-skills
+ln -s ~/src/netdata-skills/skills/* ~/.claude/skills/
 ```
 
-## Cursor
+Claude Code picks up every `SKILL.md` under `~/.claude/skills/` on session start. Use project-level `.claude/skills/` (shared) or `.claude/skills.local/` (gitignored) for per-project scoping.
 
-Cursor auto-discovers skills from `.cursor/skills/` and `~/.cursor/skills/`.
+## Cursor, Codex, Gemini CLI, and other AGENTS.md-aware agents
 
-User-global:
+Most non-Claude-Code agents read an `AGENTS.md` bridge file rather than loading skill frontmatter directly. The repo ships an `AGENTS.md` at the root that points at the skills directory.
+
+The portable install is a clone plus a project-level symlink or include:
 
 ```bash
-git clone https://github.com/netdata/skills ~/.cursor/skills/netdata-skills
+git clone git@github.com:netdata/skills.git ~/src/netdata-skills
 ```
 
-Project-local:
+Then either:
 
-```bash
-cd your-project
-git clone https://github.com/netdata/skills .cursor/skills/netdata-skills
-```
+1. In your project's own `AGENTS.md`, add a line that sources the skills directory, e.g. `@~/src/netdata-skills/AGENTS.md`; or
+2. Symlink the skills subtree into whatever convention your client documents (paths differ; check your client's docs).
 
-## Codex (OpenAI)
-
-Codex discovers skills via the `AGENTS.md` convention. Either:
-
-- Add a top-level `AGENTS.md` in your project that references this repo's skills directory, or
-- Clone into Codex's user skills directory (version-dependent; check `codex --help`).
-
-## Gemini CLI
-
-```bash
-git clone https://github.com/netdata/skills ~/.gemini/skills/netdata-skills
-```
-
-Gemini CLI reads `~/.gemini/skills/` on start.
-
-## Universal: `npx skills add`
-
-The [skills CLI](https://agentskills.io) is a client-agnostic installer:
-
-```bash
-npx skills add netdata/skills --all
-# or
-npx skills add netdata/skills --skill netdata-otel-setup
-```
-
-Installs into whichever directory the local client expects.
-
-## Copilot
-
-```bash
-git clone https://github.com/netdata/skills ~/.copilot/skills/netdata-skills
-```
-
-Or:
-
-```bash
-/plugin install netdata/skills
-```
-
-## Zed, Continue.dev, OpenCode
-
-Zed, Continue.dev, and OpenCode discover skills from `~/.agents/skills/`:
-
-```bash
-git clone https://github.com/netdata/skills ~/.agents/skills/netdata-skills
-```
+We are tracking client-specific install paths as they stabilize. If your client supports the Agent Skills format directly, the relevant content is at `<checkout>/skills/<skill-name>/SKILL.md`.
 
 ## Verifying the install
 
-Ask the agent to list its skills and check `netdata-otel-setup` appears. Or paste one of the canonical prompts from [`../tests/eval/prompts.yaml`](../tests/eval/prompts.yaml) and see if the matching skill activates.
+Ask the agent to list its skills and confirm `netdata-otel-setup` appears, or paste one of the canonical prompts from [`../tests/eval/prompts.yaml`](../tests/eval/prompts.yaml) and check the expected skill activates.
+
+For a deeper round-trip test, run the end-to-end harness:
+
+```bash
+bash tests/e2e/run-e2e.sh nodejs
+```
+
+Green means Netdata receives real OTLP traffic from a sample app that was instrumented per the skill's rule file.
 
 ## Updating
 
-Pull the repo on whichever clone path your client uses. Most clients reload on next session start; some need an explicit `/plugin reload` or equivalent.
+Pull the repo on whichever clone path your client uses. Claude Code: `/plugin marketplace update netdata-skills`. Other clients: restart the session after `git pull`.
