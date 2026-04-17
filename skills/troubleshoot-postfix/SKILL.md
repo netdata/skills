@@ -1,0 +1,94 @@
+---
+name: troubleshoot-postfix
+description: "Use when diagnosing issues with Postfix: Postfix operational issues. Queries Netdata via MCP for Postfix health signals, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+version: 0.1.0
+author: Netdata
+license: Apache-2.0
+tags:
+  - netdata
+  - troubleshoot
+  - mcp
+  - postfix
+---
+
+# Troubleshoot Postfix
+
+## When to use this skill
+
+- Any time the user reports a Postfix service behaving outside its expected envelope (elevated errors, latency, saturation, resource exhaustion, or unexpected restarts).
+- An on-call engineer is paging on a Netdata alert tied to a Postfix instance and wants a structured triage path.
+
+## Key facts
+
+- This skill wraps the Netdata operator playbook for Postfix. It does not replace the playbook; it routes a coding agent through MCP queries against the same signals the playbook relies on.
+- Postfix is a Mail Transfer Agent (MTA) that receives, queues, routes, and delivers email. Understanding its internal architecture is critical for effective monitoring.
+- INTERNAL ARCHITECTURE: - master daemon: The parent process that spawns and supervises all other Postfix daemons. Monitored via process existence and child count. - smtpd: SMTP server daemon that accepts incoming mail from clients. Binds to port 25/587/465. - smtp: SMTP client daemon that delivers outgoing mail to remote servers. - qmgr (queue manager): The brain of Postfix. Manages all mail que...
+- Netdata observes the signals listed in the rule files via its native collectors, plus any OpenTelemetry-shipped metrics that your Postfix instrumentation adds. Both paths end at the same MCP query surface.
+
+## Step-by-step
+
+1. Confirm the Postfix service is up. Query Netdata via MCP with `list_nodes` and filter by the host running the target. A missing node means the symptom is at the network or orchestrator layer, not inside the service.
+2. Pull the last 15 minutes of signals for the target. Use `query_metrics` against the contexts listed in the domain rule files. Run `find_anomalous_metrics` in parallel over the same window; anomalies frame which rule file to read first.
+3. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`, `system.disk.io_time`). Many service-level failures have a host-resource precursor.
+4. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the MCP queries from the Verification section to confirm the signals returned to expected ranges. A fix that does not move the signal back is not a fix.
+
+### Handy MCP call templates
+
+```text
+# Discover metrics from Postfix
+list_metrics with optional filter by context prefix
+
+# Pull a specific signal over the last window
+query_metrics with context=<signal>, relative_window=-15m
+
+# Rank anomalies for the service or host
+find_anomalous_metrics with host=<host> or service=<service>
+
+# Correlate a known problem signal with others
+find_correlated_metrics around the incident window
+
+# Show current alert state
+list_raised_alerts scoped to the node
+```
+
+## Common mistakes
+
+- Treating Postfix as a generic HTTP or process health check. Postfix has specific failure archetypes (see Key facts) that generic checks miss.
+- Stopping at the first anomalous metric. Several archetypes produce correlated spikes; use `find_correlated_metrics` to widen the search before concluding a root cause.
+- Quoting percentile latency without the sample count. Low traffic plus a single slow request moves p99 by seconds.
+- Reading dashboards for a window shorter than the failure's fingerprint. Slow-brew failures (queue growth, bloat, memory fragmentation) need 30+ minutes of data to see the trend.
+- Skipping the host-level correlation. A process-level fix for a noisy-neighbour problem does not hold.
+- Assuming alert thresholds are tuned for your workload. Tune against observed Postfix traffic before escalating an alert configuration issue.
+
+## Verification
+
+Run these MCP queries against the Netdata instance that sees the Postfix service:
+
+```text
+1. list_metrics filtered by the Postfix service's context prefix.
+2. query_metrics for the key signals from the first-triggered domain over the last 30 minutes.
+3. find_anomalous_metrics scoped to the same service/time window.
+```
+
+Signals the playbook considers load-bearing:
+
+  - the specific signals listed in the domain rule files
+
+A clean result means every key signal is within its expected band and the `find_anomalous_metrics` list is empty or contains only already-acknowledged items. If the fix was real, re-running the same queries 10 minutes after applying it will show a clean result. If it does not, revert and look deeper.
+
+### When the fix does not hold
+
+If signals drift back into the anomalous range within 30 minutes of a remediation, the cause was deeper than the applied change. Typical misdiagnoses for Postfix:
+
+- Host-resource pressure masquerading as application bug.
+- Dependent service (DB, cache, upstream) causing a secondary symptom in the instrumented service.
+- Configuration change that was never reloaded (some subsystems only pick up config on full restart).
+
+Escalate by widening the query window: 2-6 hours instead of 15 minutes. Slow-moving causes are invisible at triage window sizes.
+
+## References
+
+- [`rules/overview.md`](./rules/overview.md)
+- Netdata operator playbook: the authoritative source material this skill summarizes.
+- `skills/netdata-mcp-integration/` for the transport setup.
+- `skills/netdata-otel-setup/` if additional application signals are needed beyond what Netdata collects natively.
