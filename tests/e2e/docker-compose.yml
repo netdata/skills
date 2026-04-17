@@ -1,0 +1,36 @@
+services:
+  netdata:
+    image: netdata/netdata:stable
+    container_name: netdata-skills-e2e
+    hostname: netdata-e2e
+    cap_add:
+      - SYS_PTRACE
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    ports:
+      # Host 19998 -> container 19999 (dashboard + MCP)
+      - "19998:19999"
+      # Host 4317 -> container 4317 (OTLP gRPC)
+      - "4317:4317"
+    volumes:
+      - netdataconfig:/etc/netdata
+      - netdatalib:/var/lib/netdata
+      - netdatacache:/var/cache/netdata
+      - ./netdata-config/otel.yaml:/etc/netdata/otel.yaml:ro
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+    environment:
+      - DO_NOT_TRACK=1
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:19999/api/v1/info"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+volumes:
+  netdataconfig:
+  netdatalib:
+  netdatacache:

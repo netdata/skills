@@ -6,7 +6,6 @@
 npm install \
   @opentelemetry/api \
   @opentelemetry/sdk-node \
-  @opentelemetry/resources \
   @opentelemetry/sdk-metrics \
   @opentelemetry/exporter-metrics-otlp-grpc \
   @opentelemetry/auto-instrumentations-node
@@ -15,24 +14,20 @@ npm install \
 ## Minimal SDK init
 
 Save as `instrument.js` at the service root. Load it before the app starts
-(below).
+(below). Resource attributes come from env vars, which the SDK picks up
+automatically; that keeps the code free of version-sensitive Resource API
+calls.
 
 ```javascript
 // instrument.js
 const { NodeSDK } = require('@opentelemetry/sdk-node');
 const { OTLPMetricExporter } = require('@opentelemetry/exporter-metrics-otlp-grpc');
 const { PeriodicExportingMetricReader } = require('@opentelemetry/sdk-metrics');
-const { resourceFromAttributes } = require('@opentelemetry/resources');
 const { getNodeAutoInstrumentations } = require('@opentelemetry/auto-instrumentations-node');
 
 const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4317';
 
 const sdk = new NodeSDK({
-  resource: resourceFromAttributes({
-    'service.name': process.env.OTEL_SERVICE_NAME || 'unnamed-service',
-    'service.version': process.env.OTEL_SERVICE_VERSION || '0.0.0',
-    'deployment.environment': process.env.DEPLOYMENT_ENV || 'development',
-  }),
   metricReader: new PeriodicExportingMetricReader({
     exporter: new OTLPMetricExporter({ url: endpoint }),
     exportIntervalMillis: 5000,
@@ -68,11 +63,14 @@ Or inside `package.json`:
 
 ```bash
 export OTEL_SERVICE_NAME=checkout
-export OTEL_SERVICE_VERSION=1.4.0
-export DEPLOYMENT_ENV=production
+export OTEL_RESOURCE_ATTRIBUTES=service.version=1.4.0,deployment.environment=production
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://netdata.example.internal:4317
 export OTEL_EXPORTER_OTLP_PROTOCOL=grpc
 ```
+
+`OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` are picked up by the
+default resource detector; there is no need to set them on the SDK in
+code.
 
 The gRPC exporter expects a bare `http://host:port` or `https://host:port`.
 Do not suffix `/v1/metrics`; that is the OTLP/HTTP path.
