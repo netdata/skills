@@ -236,14 +236,17 @@ def strip_code_blocks(body: str) -> tuple[str, list[tuple[int, str, str]]]:
     return "\n".join(out_lines), blocks
 
 
+def strip_inline_code(line: str) -> str:
+    """Remove content inside single-backtick spans."""
+    return re.sub(r"`[^`]*`", "", line)
+
+
 def check_em_dashes(report: Report, path: pathlib.Path, prose: str) -> None:
-    if EM_DASH in prose:
-        for idx, line in enumerate(prose.splitlines(), start=1):
-            if EM_DASH in line:
-                report.error(path, f"em-dash at line {idx}: {line.strip()[:120]}")
-    double_dash = re.compile(r"(?<!-)--(?!-)")
     for idx, line in enumerate(prose.splitlines(), start=1):
-        if double_dash.search(line):
+        visible = strip_inline_code(line)
+        if EM_DASH in visible:
+            report.error(path, f"em-dash at line {idx}: {line.strip()[:120]}")
+        if re.search(r"(?<!-)--(?!-)", visible):
             report.error(path, f"double-dash at line {idx}: {line.strip()[:120]}")
 
 
