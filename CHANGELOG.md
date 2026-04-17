@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `tests/e2e/verify-metrics-cloud.py` and a `cloud` mode in
+  `run-e2e.sh` that claim the local Agent into a Netdata Cloud
+  space and probe visibility via the Cloud MCP endpoint
+  (`https://app.netdata.cloud/api/v1/mcp`). Opt-in; requires
+  `NETDATA_CLAIM_TOKEN`, `NETDATA_CLAIM_ROOMS`, and
+  `NETDATA_CLOUD_API_TOKEN` env vars.
+- `tests/eval/run-description-eval.py` as a repeatable runner for
+  the skill-description activation eval. `tests/eval/LAST_EVAL_RESULTS.json`
+  captures the latest reviewer pass (28/28 correct picks).
+
+### Changed
+
+- `verify-metrics.py` now uses a `list_metrics q-filter` instead of
+  a flat substring match, so MCP verification succeeds without the
+  previous REST fallback. Passes cleanly against both Node.js (4
+  matched contexts) and Python (9 matched contexts) fixtures.
+- `scripts/generate-troubleshoot-skills.py` wraps all prose at 100
+  columns, extracts archetypes from more header shapes (`###`,
+  `####`, with or without a "Characteristic" prefix), accepts
+  all-caps domain headers (RabbitMQ-style), uses domain names as a
+  symptom-clause fallback when archetypes are absent, and includes
+  up to 5 archetypes (from 3) in the description. All 49 Tier 2
+  skills regenerated.
+
+### Fixed
+
+- Validator line-length warnings dropped from 941 to 0.
+- Boilerplate `X operational issues` descriptions dropped from 32
+  skills to 3 (remaining 3 are playbooks whose section shapes do
+  not fit any extractable pattern).
+- Generated signal names and archetype titles are now sanitized
+  before emission so upstream em-dashes do not leak into any
+  generated skill.
+
 ## [0.1.0] - 2026-04-17
 
 First public release.
@@ -37,6 +73,6 @@ First public release.
 
 ### Known caveats
 
-- The E2E verifier prefers MCP but falls back to the REST `/api/v2/contexts` endpoint when the MCP response shape does not expose the service name directly. Tracked as a follow-up.
+- The E2E verifier prefers MCP but falls back to the REST `/api/v2/contexts` endpoint when the MCP response shape does not expose the service name directly. Tracked as a follow-up. (Resolved in Unreleased.)
 - Tier 2 skills are template-generated from the operator playbooks. A small number of playbooks lack the standard SECTION 1 signal catalog; those produce an `overview.md` rule file rather than per-domain rules.
-- No Netdata Cloud MCP coverage yet in the harness; the skills document the Cloud endpoint but the test only exercises the local Agent MCP.
+- No Netdata Cloud MCP coverage yet in the harness; the skills document the Cloud endpoint but the test only exercises the local Agent MCP. (Resolved in Unreleased.)
