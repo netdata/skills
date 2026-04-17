@@ -1,0 +1,110 @@
+# Canonical skill-activation prompts.
+#
+# Each entry is a natural-language prompt a user might type. The
+# `expected_skill` field names the SKILL.md the agent should load.
+# Optional `expected_rule` names a rules/*.md that the agent should
+# read during or after the skill body.
+#
+# Used for:
+#   1. Manual skill-activation testing (see tests/README.md).
+#   2. Future automated eval that scores how often the agent picks
+#      the right skill.
+
+netdata-otel-setup:
+  - prompt: "Set up Netdata to receive OTLP metrics from my services."
+    expected_skill: netdata-otel-setup
+  - prompt: "I'm editing /etc/netdata/otel.yaml and need the right format for a metric mapping."
+    expected_skill: netdata-otel-setup
+    expected_rule: metric-mapping.md
+  - prompt: "My OTel client can't connect to Netdata on port 4317. What am I missing?"
+    expected_skill: netdata-otel-setup
+    expected_rule: troubleshooting.md
+  - prompt: "How do I enable TLS on Netdata's OTLP receiver with client cert auth?"
+    expected_skill: netdata-otel-setup
+    expected_rule: tls-and-auth.md
+  - prompt: "Where are OTel logs stored after Netdata ingests them?"
+    expected_skill: netdata-otel-setup
+    expected_rule: log-ingestion.md
+
+netdata-instrumentation:
+  - prompt: "Add OpenTelemetry to my Node.js Express app and send it to Netdata."
+    expected_skill: netdata-instrumentation
+    expected_rule: nodejs.md
+  - prompt: "Instrument a Python Flask service so its metrics land in Netdata."
+    expected_skill: netdata-instrumentation
+    expected_rule: python.md
+  - prompt: "I need OTel for a Java Spring Boot app; Netdata is the backend."
+    expected_skill: netdata-instrumentation
+    expected_rule: java.md
+  - prompt: "What's the minimal SDK init for a Go service sending metrics to Netdata?"
+    expected_skill: netdata-instrumentation
+    expected_rule: go.md
+  - prompt: "Which resource attributes does Netdata care about?"
+    expected_skill: netdata-instrumentation
+
+netdata-collector-config:
+  - prompt: "Deploy an OTel Collector on Kubernetes that forwards everything to Netdata."
+    expected_skill: netdata-collector-config
+    expected_rule: daemonset-deployment.md
+  - prompt: "I need a gateway Collector that aggregates OTLP from 50 services and hands it to Netdata."
+    expected_skill: netdata-collector-config
+    expected_rule: gateway-deployment.md
+  - prompt: "Use the OpenTelemetry Operator to manage the Collector."
+    expected_skill: netdata-collector-config
+    expected_rule: otel-operator.md
+  - prompt: "Which Collector processors should a Netdata-bound pipeline have?"
+    expected_skill: netdata-collector-config
+    expected_rule: processors.md
+
+netdata-mcp-integration:
+  - prompt: "Wire Claude Code to my Netdata Parent node via MCP."
+    expected_skill: netdata-mcp-integration
+    expected_rule: connect-claude-code.md
+  - prompt: "How do I connect Cursor to Netdata so the agent can see my metrics?"
+    expected_skill: netdata-mcp-integration
+    expected_rule: connect-cursor.md
+  - prompt: "I just added instrumentation; how do I verify the metrics arrived without opening the dashboard?"
+    expected_skill: netdata-mcp-integration
+    expected_rule: verify-telemetry-flow.md
+  - prompt: "What MCP tools does Netdata expose?"
+    expected_skill: netdata-mcp-integration
+    expected_rule: query-patterns.md
+
+netdata-migration:
+  - prompt: "We're moving off Datadog to Netdata. What changes in the app code?"
+    expected_skill: netdata-migration
+    expected_rule: from-datadog.md
+  - prompt: "Migrate from New Relic to Netdata."
+    expected_skill: netdata-migration
+    expected_rule: from-new-relic.md
+  - prompt: "We have Prometheus scraping today; how do we route that through Netdata?"
+    expected_skill: netdata-migration
+    expected_rule: from-prometheus.md
+  - prompt: "Should I expect dashboard parity between Dynatrace and Netdata?"
+    expected_skill: netdata-migration
+    expected_rule: parity-expectations.md
+
+# Tier 2 (a sample; expand as needed)
+troubleshoot-postgresql:
+  - prompt: "Postgres connections are maxing out. Help me diagnose."
+    expected_skill: troubleshoot-postgresql
+  - prompt: "My PostgreSQL replica is lagging badly."
+    expected_skill: troubleshoot-postgresql
+    expected_rule: replication.md
+
+troubleshoot-nginx:
+  - prompt: "Nginx is returning 502s, upstream seems fine. What's going on?"
+    expected_skill: troubleshoot-nginx
+
+troubleshoot-redis:
+  - prompt: "Redis latency just spiked; fork happened a minute ago. Related?"
+    expected_skill: troubleshoot-redis
+    expected_rule: persistence.md
+
+troubleshoot-kafka:
+  - prompt: "Kafka consumer lag keeps growing despite low producer throughput."
+    expected_skill: troubleshoot-kafka
+
+troubleshoot-mysql:
+  - prompt: "MySQL replication broke with a GTID mismatch."
+    expected_skill: troubleshoot-mysql
