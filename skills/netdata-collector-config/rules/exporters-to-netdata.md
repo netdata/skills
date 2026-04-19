@@ -94,7 +94,7 @@ A single Collector with the defaults above (5000 queue size,
 4 consumers) buffers roughly 5 minutes of 1000 metrics/sec. Size
 by your throughput and tolerated outage window:
 
-```
+```text
 queue_size >= metrics_per_second * tolerated_outage_seconds
               / send_batch_size
 ```

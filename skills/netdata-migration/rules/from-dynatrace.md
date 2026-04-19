@@ -61,10 +61,10 @@ cover with separate tools:
 
 | OneAgent signal | OTel / Netdata equivalent |
 |---|---|
-| Host metrics (CPU, memory, disk) | `hostmetrics` receiver in the Collector; or Netdata's native collectors on each host. |
+| Host metrics (CPU, memory, disk) | `hostmetrics` receiver, or Netdata native collectors on each host. |
 | Process list with auto-discovery | Netdata's `apps.plugin` (native, always on). |
 | Log ingestion | `filelog` receiver on the Collector, or OTel SDK logs. |
-| Trace auto-instrumentation | OTel Operator `Instrumentation` CRD for zero-code inject; or language-specific SDKs. |
+| Trace auto-instrumentation | OTel Operator `Instrumentation` CRD for zero-code inject, or language-specific SDKs. |
 
 Note: if you are removing OneAgent from a host and adding a
 Netdata Agent, many of these signals are collected by Netdata

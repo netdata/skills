@@ -8,7 +8,7 @@ overrides it.
 
 ## Where the files go
 
-```
+```text
 /etc/netdata/otel.d/v1/metrics/
 ```
 

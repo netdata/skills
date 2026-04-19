@@ -11,7 +11,7 @@ for capturing the full OTLP envelope.
 Ingested log records are written to systemd-compatible journal files. The
 default directory is:
 
-```
+```text
 /var/log/netdata/otel/v1
 ```
 

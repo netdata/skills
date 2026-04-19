@@ -139,7 +139,7 @@ trace pipeline against Netdata.
 
 ## What NOT to put in a Netdata pipeline
 
-- `tailsampling` / `probabilistic_sampler` — these are trace-only.
-- `spanmetrics` — generates metrics from traces; fine as long as
+- `tailsampling` / `probabilistic_sampler`: these are trace-only.
+- `spanmetrics`: generates metrics from traces; fine as long as
   the input traces go to a real trace backend, but do not add
   this to a Netdata-bound pipeline that has no trace source.

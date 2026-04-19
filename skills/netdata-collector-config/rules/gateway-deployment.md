@@ -22,7 +22,7 @@ telemetry.
 
 ## Shape
 
-```
+```text
 [ SDK / DaemonSet ]  -->  [ Gateway Deployment ]  -->  [ Netdata ]
                               (N replicas)
                                        |
