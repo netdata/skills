@@ -34,17 +34,25 @@ telemetry.
 
 ## Key facts
 
-- MCP endpoint is served by every Netdata Agent, Parent, or Cloud on
-  the same port as the dashboard (default `19999`).
-- Two URL paths: `/mcp` (HTTP streamable and WebSocket) and `/sse`
-  (Server-Sent Events). Both live under
-  `http://HOST:19999`. For WebSocket, use `ws://HOST:19999/mcp`.
-- Transports supported: HTTP streamable (default on `/mcp`), SSE,
-  WebSocket, and stdio via the `nd-mcp` bridge binary.
-- Auth: bearer token via the header `Authorization: Bearer <token>`.
-  The token is a UUID Netdata generates at first start, stored at
-  `/var/lib/netdata/mcp_dev_preview_api_key` (native installs) or
-  `/opt/netdata/var/lib/netdata/mcp_dev_preview_api_key` (static).
+- Two deployment targets, two endpoint shapes:
+  - **Local Agent or Parent**: `http://HOST:19999/mcp` on the same
+    port as the dashboard.
+  - **Netdata Cloud**: `https://app.netdata.cloud/api/v1/mcp`.
+    Production endpoint, available on Business plans.
+- Local Agent transports are version-gated. Pick the one the target
+  Netdata supports:
+  - WebSocket (`ws://HOST:19999/mcp`): available since v2.6.0.
+  - HTTP streamable (`http://HOST:19999/mcp`) and SSE
+    (`http://HOST:19999/sse`): available since v2.7.2.
+  - stdio via the `nd-mcp` bridge binary works against any of the
+    above by URL scheme.
+- Cloud MCP uses Streamable HTTP only (stateless, proxy-friendly).
+- Auth: bearer token via `Authorization: Bearer <token>`.
+  - **Local**: the token is a UUID Netdata generates at first start,
+    stored at `/var/lib/netdata/mcp_dev_preview_api_key` (native) or
+    `/opt/netdata/var/lib/netdata/mcp_dev_preview_api_key` (static).
+  - **Cloud**: the token is a Netdata Cloud API token created in the
+    Cloud UI under **Space settings** then **API tokens**.
 - No user/password auth. No per-tool permission grants. A bearer
   token is all-or-nothing.
 - The `nd-mcp` bridge is bundled with Netdata. Paths:
@@ -66,19 +74,29 @@ telemetry.
 
 1. Pick the right Netdata to connect to:
    - A **Parent node** gives visibility across every child streaming
-     to it. Best choice for an agent that needs the broadest view.
+     to it. Best choice for an agent that needs the broadest view of
+     a single-space fleet.
    - A **Child/standalone Agent** gives visibility into that one host.
      Fine for local dev or single-server setups.
-   - **Netdata Cloud** MCP is not yet generally available at the time
-     of this release; check the Netdata docs before relying on it.
+   - **Netdata Cloud** gives visibility across every space and room
+     the token's user can reach. Best choice when the agent needs
+     multi-space or multi-region reach. Cloud MCP is a production
+     endpoint on Business plans; see
+     https://learn.netdata.cloud/docs/netdata-ai/mcp.
 
-2. Read the API key off the target host:
+2. Get the bearer token for the target:
+
+   For a local Agent or Parent, read the key off the host:
 
    ```bash
    sudo cat /var/lib/netdata/mcp_dev_preview_api_key
    # or, for static installs:
    sudo cat /opt/netdata/var/lib/netdata/mcp_dev_preview_api_key
    ```
+
+   For Cloud, create a token in the Cloud UI under **Space settings**
+   then **API tokens**, and store it in the environment variable the
+   client config references (typically `NETDATA_CLOUD_API_TOKEN`).
 
 3. Configure the agent's MCP client. Pick the transport that matches
    what the agent supports (see the `rules/` per-client files).

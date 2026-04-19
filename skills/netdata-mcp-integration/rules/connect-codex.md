@@ -2,31 +2,59 @@
 
 ## Codex
 
-OpenAI Codex supports MCP via its config file. Add a server entry:
+Codex reads MCP server config from `~/.codex/config.toml` (or
+project-scoped `.codex/config.toml` in a trusted project). Each MCP
+server is registered as a `[mcp_servers.<name>]` table. Codex
+supports two server shapes: stdio (via a local bridge command) and
+HTTP (direct to a remote MCP endpoint).
+
+### HTTP server (preferred for Netdata)
+
+Netdata's MCP endpoint speaks HTTP streamable on both local Agents
+(v2.7.2+) and Netdata Cloud. Point Codex directly at it:
 
 ```toml
-# ~/.config/codex/config.toml
-[[mcp_servers]]
-name = "netdata"
+# ~/.codex/config.toml — local Agent or Parent
+[mcp_servers.netdata]
+url = "http://NETDATA_HOST:19999/mcp"
+bearer_token_env_var = "NETDATA_MCP_TOKEN"
+```
+
+```toml
+# ~/.codex/config.toml — Netdata Cloud
+[mcp_servers.netdata-cloud]
+url = "https://app.netdata.cloud/api/v1/mcp"
+bearer_token_env_var = "NETDATA_CLOUD_API_TOKEN"
+```
+
+Export the matching env var in the shell Codex runs in:
+
+```bash
+export NETDATA_MCP_TOKEN="$(ssh NETDATA_HOST sudo cat /var/lib/netdata/mcp_dev_preview_api_key)"
+# or, for Cloud:
+export NETDATA_CLOUD_API_TOKEN="<token from Cloud UI>"
+```
+
+### stdio server (for older Agents or WebSocket)
+
+If the target Agent is older than v2.7.2, HTTP streamable is not
+available; connect via the `nd-mcp` bridge over WebSocket instead:
+
+```toml
+# ~/.codex/config.toml
+[mcp_servers.netdata]
 command = "/usr/bin/nd-mcp"
-args = ["--bearer", "YOUR_API_KEY", "ws://NETDATA_HOST:19999/mcp"]
+args = ["ws://NETDATA_HOST:19999/mcp"]
+
+[mcp_servers.netdata.env]
+ND_MCP_BEARER = "paste-token-here"
 ```
 
-For Codex versions that take JSON:
+WebSocket is available on Netdata v2.6.0+. Pass the token through an
+env var the bridge reads, not as a CLI flag.
 
-```json
-{
-  "mcpServers": {
-    "netdata": {
-      "command": "/usr/bin/nd-mcp",
-      "args": ["--bearer", "YOUR_API_KEY", "ws://NETDATA_HOST:19999/mcp"]
-    }
-  }
-}
-```
-
-Replace `YOUR_API_KEY` and `NETDATA_HOST` as in the other clients.
-Restart Codex, then ask it to list its available MCP tools.
+Restart Codex, then run `/mcp` (or the equivalent in your Codex
+version) to confirm the `netdata` server is listed with its tools.
 
 ## Gemini CLI
 
@@ -38,23 +66,29 @@ per-project `.gemini/settings.json`.
   "mcpServers": {
     "netdata": {
       "command": "/usr/bin/nd-mcp",
-      "args": ["--bearer", "YOUR_API_KEY", "ws://NETDATA_HOST:19999/mcp"]
+      "args": ["ws://NETDATA_HOST:19999/mcp"],
+      "env": { "ND_MCP_BEARER": "paste-token-here" }
     }
   }
 }
 ```
 
+For direct HTTP streamable against v2.7.2+ Agents or Cloud, use the
+HTTP form Gemini CLI supports in its current release; consult the
+Gemini CLI docs for the exact JSON shape.
+
 Launch Gemini CLI and type `/mcp` to list registered servers.
 
 ## Transport preferences
 
-- Codex and Gemini CLI both speak stdio well via `nd-mcp`.
-- For long-running sessions on remote Netdata, prefer the WebSocket
-  URL (`ws://…`) as shown. It avoids polling and keeps the token
-  handshake once per session.
-- Native HTTP streamable works only on the newest builds of these
-  clients; fall back to stdio-via-bridge when the HTTP form is
-  unsupported.
+- For local Agents on v2.7.2 or newer, prefer HTTP streamable. It is
+  stateless and proxy-friendly.
+- For Agents between v2.6.0 and v2.7.1, use WebSocket through the
+  `nd-mcp` bridge.
+- For Netdata Cloud, only HTTP streamable is available; point Codex
+  directly at the Cloud endpoint.
+- stdio-via-bridge works against any of the above by URL scheme and
+  is the most portable option when client HTTP support is uneven.
 
 ## API key rotation
 
@@ -62,6 +96,9 @@ If the token in `mcp_dev_preview_api_key` is rotated on the Netdata
 host (by deleting the file and restarting Netdata), every client
 config needs to be updated. There is no JWT expiry; the bearer value
 is static until the file is regenerated.
+
+For Cloud tokens, rotation happens in the Cloud UI; old tokens stop
+working immediately after revocation.
 
 ## Troubleshooting
 
@@ -74,6 +111,8 @@ is static until the file is regenerated.
   side-effecting tools with the user by default. That is correct
   behavior; `execute_function` is the only MCP tool Netdata marks as
   having side effects.
+- **HTTP form returns 404 on a local Agent**: the Agent is older
+  than v2.7.2. Fall back to the WebSocket form via `nd-mcp`.
 
 ## Verify the connection
 
