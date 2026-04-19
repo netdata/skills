@@ -75,17 +75,42 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Connection Management
+
+These are the real Netdata chart contexts the native collector emits for Proxysql. Use these names
+verbatim in `query_metrics` calls.
+
+- `proxysql.client_connections_count`: Client connections (connections). Dimensions: connected,
+                                       non_idle, hostgroup_locked.
+- `proxysql.client_connections_rate`: Client connections rate (connections/s). Dimensions: created,
+                                      aborted.
+- `proxysql.server_connections_count`: Server connections (connections). Dimensions: connected.
+- `proxysql.server_connections_rate`: Server connections rate (connections/s). Dimensions: created,
+                                      aborted, delayed.
+- `proxysql.active_transactions_count`: Client connections that are currently processing a
+                                        transaction (connections). Dimensions: client.
+- `proxysql.backend_statements_count`: Statements available across all backend connections
+                                       (statements). Dimensions: total, unique.
+- `proxysql.mysql_user_connections_utilization`: MySQL user connections utilization (percentage).
+                                                 Dimensions: used.
+- `proxysql.mysql_user_connections_count`: MySQL user connections used (connections). Dimensions:
+                                           used.
+- `proxysql.backend_connections_usage`: Backend connections usage (connections). Dimensions: free,
+                                        used.
+- `proxysql.backend_connections_rate`: Backend connections established (connections/s). Dimensions:
+                                       succeed, failed.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[proxysql.client_connections_count, proxysql.client_connections_rate, proxysql.server_connections_count, proxysql.server_connections_rate, proxysql.active_transactions_count, proxysql.backend_statements_count] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Proxysql service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="proxysql.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="proxysql.client_connections_count"
 ```
 
 ## When to escalate out of this skill

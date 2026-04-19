@@ -46,17 +46,43 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Overview
+
+These are the real Netdata chart contexts the native collector emits for Docker Engine. Use these
+names verbatim in `query_metrics` calls.
+
+- `docker_engine.engine_daemon_container_actions`: Container Actions (actions/s). Dimensions:
+                                                   changes, commit, create, delete, start.
+- `docker_engine.engine_daemon_container_states_containers`: Containers In Various States
+                                                             (containers). Dimensions: running,
+                                                             paused, stopped.
+- `docker_engine.builder_builds_failed_total`: Builder Builds Fails By Reason (fails/s). Dimensions:
+                                               build_canceled, build_target_not_reachable_error,
+                                               command_not_supported_error, dockerfile_empty_error,
+                                               dockerfile_syntax_error,
+                                               error_processing_commands_error.
+- `docker_engine.engine_daemon_health_checks_failed_total`: Health Checks (events/s). Dimensions:
+                                                            fails.
+- `docker_engine.swarm_manager_leader`: Swarm Manager Leader (bool). Dimensions: is_leader.
+- `docker_engine.swarm_manager_object_store`: Swarm Manager Object Store (objects). Dimensions:
+                                              nodes, services, tasks, networks, secrets, configs.
+- `docker_engine.swarm_manager_nodes_per_state`: Swarm Manager Nodes Per State (nodes). Dimensions:
+                                                 ready, down, unknown, disconnected.
+- `docker_engine.swarm_manager_tasks_per_state`: Swarm Manager Tasks Per State (tasks). Dimensions:
+                                                 running, failed, ready, rejected, starting,
+                                                 shutdown.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[docker_engine.engine_daemon_container_actions, docker_engine.engine_daemon_container_states_containers, docker_engine.builder_builds_failed_total, docker_engine.engine_daemon_health_checks_failed_total, docker_engine.swarm_manager_leader, docker_engine.swarm_manager_object_store] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Docker Engine service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="docker_engine.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="docker_engine.engine_daemon_container_actions"
 ```
 
 ## When to escalate out of this skill

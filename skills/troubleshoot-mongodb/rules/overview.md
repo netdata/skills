@@ -46,17 +46,40 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Overview
+
+These are the real Netdata chart contexts the native collector emits for MongoDB. Use these names
+verbatim in `query_metrics` calls.
+
+- `mongodb.operations_rate`: Operations rate (operations/s). Dimensions: reads, writes, commands.
+- `mongodb.operations_latency_time`: Operations Latency (milliseconds). Dimensions: reads, writes,
+                                     commands.
+- `mongodb.operations_by_type_rate`: Operations by type (operations/s). Dimensions: insert, query,
+                                     update, delete, getmore, command.
+- `mongodb.document_operations_rate`: Document operations (operations/s). Dimensions: inserted,
+                                      deleted, returned, updated.
+- `mongodb.scanned_indexes_rate`: Scanned indexes (indexes/s). Dimensions: scanned.
+- `mongodb.scanned_documents_rate`: Scanned documents (documents/s). Dimensions: scanned.
+- `mongodb.active_clients_count`: Connected clients (clients). Dimensions: readers, writers.
+- `mongodb.queued_operations_count`: Queued operations because of a lock (operations). Dimensions:
+                                     reads, writes.
+- `mongodb.cursors_open_count`: Open cursors (cursors). Dimensions: open.
+- `mongodb.cursors_open_no_timeout_count`: Open cursors with disabled timeout (cursors). Dimensions:
+                                           open_no_timeout.
+- `mongodb.cursors_opened_rate`: Opened cursors rate (cursors/s). Dimensions: opened.
+- `mongodb.cursors_timed_out_rate`: Timed-out cursors (cursors/s). Dimensions: timed_out.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[mongodb.operations_rate, mongodb.operations_latency_time, mongodb.operations_by_type_rate, mongodb.document_operations_rate, mongodb.scanned_indexes_rate, mongodb.scanned_documents_rate] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the MongoDB service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="mongodb.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="mongodb.operations_rate"
 ```
 
 ## When to escalate out of this skill

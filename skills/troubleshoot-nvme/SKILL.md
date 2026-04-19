@@ -33,6 +33,9 @@ tags:
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your NVMe instrumentation adds. Both paths end at the same MCP
   query surface.
+- Netdata's nvme collector emits 16 context(s) under `nvme.*`. The rule files enumerate which
+  contexts surface which domain; the Verification section below names the load-bearing ones
+  explicitly.
 
 ## Step-by-step
 
@@ -52,15 +55,15 @@ tags:
 
 ```text
 # Discover metrics from NVMe
-list_metrics with optional filter by context prefix
+list_metrics with q="nvme"
 
-# Pull a specific signal over the last window
-query_metrics with context=<signal>, relative_window=-15m
+# Pull a specific context over the last window
+query_metrics with context="nvme.device_critical_warnings_state", relative_window=-15m
 
 # Rank anomalies for the service or host
-find_anomalous_metrics with host=<host> or service=<service>
+find_anomalous_metrics with node=<host> and context_pattern="nvme.*"
 
-# Correlate a known problem signal with others
+# Correlate a known problem context with others
 find_correlated_metrics around the incident window
 
 # Show current alert state
@@ -84,23 +87,31 @@ list_raised_alerts scoped to the node
 
 ## Verification
 
-Run these MCP queries against the Netdata instance that sees the NVMe service:
+Run these MCP queries against the Netdata instance that sees the NVMe service. Every context listed
+below is a real Netdata chart name; the agent does not need to guess.
 
 ```text
-1. list_metrics filtered by the NVMe service's context prefix.
-2. query_metrics for the key signals from the first-triggered domain over the last 30 minutes.
-3. find_anomalous_metrics scoped to the same service/time window.
+1. list_metrics filtered by q="nvme" (returns every nvme.* context Netdata sees)
+2. query_metrics with contexts=[nvme.device_critical_warnings_state, nvme.device_unsafe_shutdowns_count, nvme.device_media_errors_rate, nvme.device_error_log_entries_rate, nvme.device_thermal_mgmt_temp1_transitions_rate, nvme.device_thermal_mgmt_temp2_transitions_rate] and relative_window=-30m
+3. find_anomalous_metrics filtered by node=<host> and context_pattern="nvme.*"
 ```
 
-Signals the playbook considers load-bearing:
+Load-bearing contexts for this service:
 
-  - Controller State
-  - SMART Critical Warning; Read-Only Mode (Bit 3)
-  - SMART Critical Warning; NVM Subsystem Reliability Degraded (Bit 2)
-  - SMART Critical Warning; Available Spare Below Threshold (Bit 0)
+- `nvme.device_critical_warnings_state`: Critical warnings state (state). Dimensions:
+                                         available_spare, temp_threshold, nvm_subsystem_reliability,
+                                         read_only, volatile_mem_backup_failed,
+                                         persistent_memory_read_only.
+- `nvme.device_unsafe_shutdowns_count`: Unsafe shutdowns (shutdowns). Dimensions: unsafe.
+- `nvme.device_media_errors_rate`: Media and data integrity errors (errors/s). Dimensions: media.
+- `nvme.device_error_log_entries_rate`: Error log entries (entries/s). Dimensions: error_log.
+- `nvme.device_thermal_mgmt_temp1_transitions_rate`: Thermal management temp1 transitions
+                                                     (transitions/s). Dimensions: temp1.
+- `nvme.device_thermal_mgmt_temp2_transitions_rate`: Thermal management temp2 transitions
+                                                     (transitions/s). Dimensions: temp2.
 
-A clean result means every key signal is within its expected band and the `find_anomalous_metrics`
-list is empty or contains only already-acknowledged items. If the fix was real, re-running the same
+A clean result means every context is within its expected band and the `find_anomalous_metrics` list
+is empty or contains only already-acknowledged items. If the fix was real, re-running the same
 queries 10 minutes after applying it will show a clean result. If it does not, revert and look
 deeper.
 

@@ -97,17 +97,40 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Throughput & Latency
+
+These are the real Netdata chart contexts the native collector emits for Redis. Use these names
+verbatim in `query_metrics` calls.
+
+- `redis.clients`: Clients (clients). Dimensions: connected, blocked, tracking, in_timeout_table.
+- `redis.ping_latency`: Ping latency (seconds). Dimensions: min, max, avg.
+- `redis.commands`: Processed commands (commands/s). Dimensions: processes.
+- `redis.keyspace_lookup_hit_rate`: Keys lookup hit rate (percentage). Dimensions: lookup_hit_rate.
+- `redis.rdb_changes`: Operations that produced changes since the last SAVE or BGSAVE (operations).
+                       Dimensions: changes.
+- `redis.bgsave_now`: Duration of the on-going RDB save operation if any (seconds). Dimensions:
+                      current_bgsave_time.
+- `redis.bgsave_last_rdb_save_since_time`: Time elapsed since the last successful RDB save
+                                           (seconds). Dimensions: last_bgsave_time.
+- `redis.commands_calls`: Calls per command (calls).
+- `redis.commands_usec`: Total CPU time consumed by the commands (microseconds).
+- `redis.commands_usec_per_sec`: Average CPU consumed per command execution (microseconds/s).
+- `redis.master_last_io_since_time`: Time elapsed since the last interaction with master (seconds).
+                                     Dimensions: time.
+- `redis.master_link_down_since_time`: Time elapsed since the link between master and slave is down
+                                       (seconds). Dimensions: time.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[redis.clients, redis.ping_latency, redis.commands, redis.keyspace_lookup_hit_rate, redis.rdb_changes, redis.bgsave_now] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Redis service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="redis.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="redis.clients"
 ```
 
 ## When to escalate out of this skill

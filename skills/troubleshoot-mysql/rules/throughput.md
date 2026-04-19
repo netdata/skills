@@ -64,17 +64,41 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Throughput
+
+These are the real Netdata chart contexts the native collector emits for MySQL. Use these names
+verbatim in `query_metrics` calls.
+
+- `mysql.queries`: Queries (queries/s). Dimensions: queries, questions, slow_queries.
+- `mysql.queries_type`: Queries By Type (queries/s). Dimensions: select, delete, update, insert,
+                        replace.
+- `mysql.tmp`: Tmp Operations (events/s). Dimensions: disk_tables, files, tables.
+- `mysql.threads_created`: Threads Creation Rate (threads/s). Dimensions: created.
+- `mysql.innodb_io_ops`: InnoDB I/O Operations (operations/s). Dimensions: reads, writes, fsyncs.
+- `mysql.innodb_io_pending_ops`: InnoDB Pending I/O Operations (operations). Dimensions: reads,
+                                 writes, fsyncs.
+- `mysql.innodb_log`: InnoDB Log Operations (operations/s). Dimensions: waits, write_requests,
+                      writes.
+- `mysql.innodb_rows`: InnoDB Row Operations (operations/s). Dimensions: inserted, read, updated,
+                       deleted.
+- `mysql.innodb_buffer_pool_pages_flushed`: InnoDB Buffer Pool Flush Pages Requests (requests/s).
+                                            Dimensions: flush_pages.
+- `mysql.innodb_buffer_pool_ops`: InnoDB Buffer Pool Operations (operations/s). Dimensions:
+                                  disk_reads, wait_free.
+- `mysql.innodb_os_log`: InnoDB OS Log Pending Operations (operations). Dimensions: fsyncs, writes.
+- `mysql.innodb_os_log_fsync_writes`: InnoDB OS Log Operations (operations/s). Dimensions: fsyncs.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[mysql.queries, mysql.queries_type, mysql.tmp, mysql.threads_created, mysql.innodb_io_ops, mysql.innodb_io_pending_ops] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the MySQL service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="mysql.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="mysql.queries"
 ```
 
 ## When to escalate out of this skill

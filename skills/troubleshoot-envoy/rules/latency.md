@@ -77,17 +77,42 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Latency
+
+These are the real Netdata chart contexts the native collector emits for Envoy. Use these names
+verbatim in `query_metrics` calls.
+
+- `envoy.server_uptime`: Server uptime (seconds). Dimensions: uptime.
+- `envoy.cluster_upstream_cx_connect_timeout_rate`: Cluster upstream timed out connections
+                                                    (connections/s). Dimensions: timeout.
+- `envoy.cluster_upstream_rq_failed_rate`: Cluster upstream failed requests (requests/s).
+                                           Dimensions: cancelled, maintenance_mode, timeout,
+                                           max_duration_reached, per_try_timeout, reset_local.
+- `envoy.listener_admin_downstream_cx_transport_socket_connect_timeout_rate`: Listener admin
+                                                                              downstream timed out
+                                                                              connections
+                                                                              (connections/s).
+                                                                              Dimensions: timeout.
+- `envoy.listener_admin_downstream_pre_cx_timeout_rate`: Listener admin downstream timed out sockets
+                                                         (sockets/s). Dimensions: timeout.
+- `envoy.listener_downstream_cx_transport_socket_connect_timeout_rate`: Listener downstream timed
+                                                                        out connections
+                                                                        (connections/s). Dimensions:
+                                                                        timeout.
+- `envoy.listener_downstream_pre_cx_timeout_rate`: Listener downstream timed out sockets
+                                                   (sockets/s). Dimensions: timeout.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[envoy.server_uptime, envoy.cluster_upstream_cx_connect_timeout_rate, envoy.cluster_upstream_rq_failed_rate, envoy.listener_admin_downstream_cx_transport_socket_connect_timeout_rate, envoy.listener_admin_downstream_pre_cx_timeout_rate, envoy.listener_downstream_cx_transport_socket_connect_timeout_rate] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Envoy service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="envoy.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="envoy.server_uptime"
 ```
 
 ## When to escalate out of this skill

@@ -46,17 +46,50 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Overview
+
+These are the real Netdata chart contexts the native collector emits for NVIDIA DCGM. Use these
+names verbatim in `query_metrics` calls.
+
+- `dcgm.gpu.capability.support`: GPU Capability Support metrics. (state). Dimensions: cc_mode,
+                                 cuda_compute_capability, gpm_support, mig_attributes, mig_ci_info,
+                                 mig_gi_info.
+- `dcgm.gpu.clock.frequency`: GPU Clock Frequency metrics. (MHz). Dimensions: app_mem_clock,
+                              app_sm_clock, max_mem_clock, max_sm_clock, max_video_clock, memory.
+- `dcgm.gpu.compute.activity`: GPU Compute Pipeline Activity metrics. (%). Dimensions: dram, fp16,
+                               fp32, fp64, graphics_engine_active, integer.
+- `dcgm.gpu.compute.tensor.activity`: GPU Tensor Core Activity by precision type. (%). Dimensions:
+                                      tensor_dfma, tensor_hmma, tensor_imma.
+- `dcgm.gpu.compute.media.activity`: GPU Media Engine Activity metrics. (%). Dimensions:
+                                     nvdec0_active, nvdec1_active, nvdec2_active, nvdec3_active,
+                                     nvdec4_active, nvdec5_active.
+- `dcgm.gpu.compute.cache.activity`: GPU Memory Cache Hit/Miss metrics. (events/s). Dimensions:
+                                     hostmem_cache_hit, hostmem_cache_miss, peermem_cache_hit,
+                                     peermem_cache_miss.
+- `dcgm.gpu.compute.utilization`: GPU Compute Utilization metrics. (%). Dimensions: decoder,
+                                  encoder, gpu, memory_copy.
+- `dcgm.gpu.cpu.power`: GPU CPU Power metrics. (Watts). Dimensions: module_power_util_current,
+                        sysio_power_util_current.
+- `dcgm.gpu.cpu.info`: GPU CPU Information metrics. (value). Dimensions: cpu_model, cpu_vendor.
+- `dcgm.gpu.diagnostics.results`: GPU Diagnostics Results metrics. (state). Dimensions:
+                                  diag_diagnostic_result, diag_eud_result,
+                                  diag_memory_bandwidth_result, diag_memory_result,
+                                  diag_memtest_result, diag_nccl_tests_result.
+- `dcgm.gpu.diagnostics.status`: GPU Diagnostics Status metrics. (state). Dimensions: diag_status.
+- `dcgm.gpu.health.status`: GPU Health Status metrics. (state). Dimensions: imex_daemon_status,
+                            imex_domain_status.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[dcgm.gpu.capability.support, dcgm.gpu.clock.frequency, dcgm.gpu.compute.activity, dcgm.gpu.compute.tensor.activity, dcgm.gpu.compute.media.activity, dcgm.gpu.compute.cache.activity] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the NVIDIA DCGM service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="dcgm.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="dcgm.gpu.capability.support"
 ```
 
 ## When to escalate out of this skill

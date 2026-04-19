@@ -46,17 +46,44 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Overview
+
+These are the real Netdata chart contexts the native collector emits for Elasticsearch. Use these
+names verbatim in `query_metrics` calls.
+
+- `elasticsearch.node_indices_indexing`: Indexing Operations (operations/s). Dimensions: index.
+- `elasticsearch.node_indices_indexing_current`: Indexing Operations Current (operations).
+                                                 Dimensions: index.
+- `elasticsearch.node_indices_indexing_time`: Time Spent On Indexing Operations (milliseconds).
+                                              Dimensions: index.
+- `elasticsearch.node_indices_search`: Search Operations (operations/s). Dimensions: queries,
+                                       fetches.
+- `elasticsearch.node_indices_search_current`: Search Operations Current (operations). Dimensions:
+                                               queries, fetches.
+- `elasticsearch.node_indices_search_time`: node_indices_search_time (milliseconds). Dimensions:
+                                            queries, fetches.
+- `elasticsearch.node_indices_refresh`: Refresh Operations (operations/s). Dimensions: refresh.
+- `elasticsearch.node_indices_refresh_time`: Time Spent On Refresh Operations (milliseconds).
+                                             Dimensions: refresh.
+- `elasticsearch.node_indices_flush`: Flush Operations (operations/s). Dimensions: flush.
+- `elasticsearch.node_indices_flush_time`: Time Spent On Flush Operations (milliseconds).
+                                           Dimensions: flush.
+- `elasticsearch.node_indices_fielddata_memory_usage`: Fielddata Cache Memory Usage (bytes).
+                                                       Dimensions: used.
+- `elasticsearch.node_indices_fielddata_evictions`: Fielddata Evictions (operations/s). Dimensions:
+                                                    evictions.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[elasticsearch.node_indices_indexing, elasticsearch.node_indices_indexing_current, elasticsearch.node_indices_indexing_time, elasticsearch.node_indices_search, elasticsearch.node_indices_search_current, elasticsearch.node_indices_search_time] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Elasticsearch service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="elasticsearch.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="elasticsearch.node_indices_indexing"
 ```
 
 ## When to escalate out of this skill

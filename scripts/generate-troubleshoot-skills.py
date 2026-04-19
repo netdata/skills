@@ -28,11 +28,118 @@ import re
 import sys
 import textwrap
 
+import yaml
+
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 PLAYBOOKS_DIR = REPO_ROOT.parent / "_reference" / "netdata-playbooks"
+NETDATA_DIR = REPO_ROOT.parent / "_reference" / "netdata"
+GO_COLLECTORS_DIR = NETDATA_DIR / "src" / "go" / "plugin" / "go.d" / "collector"
 SKILLS_DIR = REPO_ROOT / "skills"
 
 TROUBLESHOOT_PREFIX = "troubleshoot-"
+
+# Explicit playbook-slug -> Netdata collector-dir mapping. Anything not
+# listed here falls through to the generic "discover via list_metrics"
+# guidance. Keep this list in sync with the playbooks directory.
+PLAYBOOK_TO_COLLECTOR: dict[str, str] = {
+    "activemq": "activemq",
+    "apache-httpd": "apache",
+    "apache-pulsar": "pulsar",
+    "bind-dns": "bind",
+    "cassandra": "cassandra",
+    "ceph": "ceph",
+    "clickhouse": "clickhouse",
+    "cockroachdb": "cockroachdb",
+    "consul": "consul",
+    "coredns": "coredns",
+    "docker": "docker",
+    "docker-engine": "docker_engine",
+    "elasticsearch": "elasticsearch",
+    "envoy": "envoy",
+    "fluentd": "fluentd",
+    "haproxy": "haproxy",
+    # kafka: no native Go collector. Agents typically scrape via the
+    # Prometheus JMX exporter; contexts are prom-style and cannot be
+    # enumerated statically. Skill falls back to discovery guidance.
+    "kubernetes-api-server": "k8s_apiserver",
+    "kubernetes-cluster-state": "k8s_state",
+    "kubernetes-kube-proxy": "k8s_kubeproxy",
+    "kubernetes-kubelet": "k8s_kubelet",
+    "logstash": "logstash",
+    "lvm": "lvm",
+    "memcached": "memcached",
+    "microsoft-sql-server": "mssql",
+    "mongodb": "mongodb",
+    "mysql": "mysql",
+    "nats": "nats",
+    "nginx": "nginx",
+    "nvidia-dcgm": "dcgm",
+    "nvidia-gpu": "nvidia_smi",
+    "nvme": "nvme",
+    "oracle-database": "oracledb",
+    "pgbouncer": "pgbouncer",
+    "php-fpm": "phpfpm",
+    "postfix": "postfix",
+    "postgresql": "postgres",
+    "proxysql": "proxysql",
+    "rabbitmq": "rabbitmq",
+    "redis": "redis",
+    "smartctl-disk-monitoring": "smartctl",
+    "tomcat": "tomcat",
+    "traefik": "traefik",
+    "uwsgi": "uwsgi",
+    "varnish": "varnish",
+    "vmware-vcsa": "vcsa",
+    "vmware-vsphere": "vsphere",
+    "zfs": "zfspool",
+    "zookeeper": "zookeeper",
+}
+
+# Domain-name keywords that group Netdata contexts by playbook domain.
+# Lookup is case-insensitive. A context matches a domain if any keyword
+# appears in the context's name, description, or one of its dimensions.
+# The 'default' bucket catches whatever did not match elsewhere.
+DOMAIN_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "availability": (
+        "uptime", "ping", "status", "up", "down", "reachability",
+        "connection", "connected", "health", "alive",
+    ),
+    "connectivity": (
+        "connection", "client", "net", "bandwidth", "bytes",
+        "packets", "socket", "listen",
+    ),
+    "throughput": (
+        "commands", "ops", "operations", "requests", "calls",
+        "queries", "rate", "processed", "throughput", "traffic",
+    ),
+    "latency": (
+        "latency", "duration", "time", "slow", "wait",
+    ),
+    "errors": (
+        "error", "failed", "rejected", "dropped", "fail",
+        "timeout", "denied", "retries",
+    ),
+    "resource": (
+        "memory", "cpu", "ratio", "usage", "pool", "heap",
+        "buffer", "cache", "allocated", "rss", "fragmentation",
+    ),
+    "storage": (
+        "disk", "io", "rdb", "aof", "persistence", "save",
+        "writeback", "space", "volume", "fs",
+    ),
+    "replication": (
+        "master", "replica", "slave", "replication", "cluster",
+        "follower", "leader", "link",
+    ),
+    "keyspace": (
+        "keys", "keyspace", "database", "eviction", "expire",
+        "expiration", "expired",
+    ),
+    "queue": (
+        "queue", "consumer", "producer", "message", "publish",
+        "delivery", "backlog", "lag",
+    ),
+}
 
 DOMAIN_HEADER_RE = re.compile(
     r"^(?:\*\*DOMAIN:\s*(?P<bold_domain>[^*]+?)\*\*"
@@ -51,6 +158,121 @@ SECTION2_RE = re.compile(r"^#{2,3}\s*SECTION\s*2\s*.*?$", re.MULTILINE)
 FAILURE_HEADER_RE = re.compile(
     r"(?i)(?:\*\*|#{2,5}\s+)(?:characteristic\s+)?failure\s+archetypes[:.]?",
 )
+
+
+def load_collector_contexts(playbook_slug: str) -> list[dict]:
+    """Return a list of real Netdata contexts for this playbook's tech.
+
+    Each entry is ``{name, description, unit, scope, dimensions}``. An
+    empty list means we have no mapping for this tech or the metadata
+    file is missing. Callers fall back to generic discovery guidance.
+    """
+    coll = PLAYBOOK_TO_COLLECTOR.get(playbook_slug)
+    if not coll:
+        return []
+    md_path = GO_COLLECTORS_DIR / coll / "metadata.yaml"
+    if not md_path.is_file():
+        return []
+    try:
+        data = yaml.safe_load(md_path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError:
+        return []
+    out: list[dict] = []
+    for mod in data.get("modules", []) or []:
+        metrics_block = mod.get("metrics") or {}
+        for scope in metrics_block.get("scopes", []) or []:
+            scope_name = scope.get("name") or "global"
+            for m in scope.get("metrics", []) or []:
+                name = (m.get("name") or "").strip()
+                if not name or "." not in name:
+                    continue
+                dims = [
+                    (d.get("name") or "").strip()
+                    for d in (m.get("dimensions") or [])
+                    if isinstance(d, dict) and d.get("name")
+                ]
+                out.append({
+                    "name": name,
+                    "description": (m.get("description") or "").strip(),
+                    "unit": (m.get("unit") or "").strip(),
+                    "scope": scope_name,
+                    "dimensions": dims,
+                })
+    return out
+
+
+def _domain_keywords(domain_name: str) -> set[str]:
+    """Map a playbook domain name to a keyword set for context matching.
+
+    Uses the domain name itself plus any preset bucket whose label
+    appears in the name. Falls back to the name's own tokens so
+    unrecognized domains still pick up obvious name matches.
+    """
+    dn = domain_name.lower()
+    keys: set[str] = set()
+    # Always include the tokens in the domain name itself.
+    for tok in re.split(r"[^a-z0-9]+", dn):
+        if len(tok) >= 4:
+            keys.add(tok)
+    # Pull in preset bucket keywords for any bucket whose label is
+    # referenced in the domain name.
+    for bucket, words in DOMAIN_KEYWORDS.items():
+        if bucket in dn:
+            keys.update(words)
+    return keys
+
+
+def classify_contexts_by_domain(
+    contexts: list[dict],
+    domains: list[tuple[str, list[tuple[str, str]]]],
+) -> dict[str, list[dict]]:
+    """Return ``{domain_name: [context, ...]}`` plus a synthetic
+    ``"__unmatched__"`` bucket for contexts that did not key into any
+    domain.
+
+    Matching is keyword overlap between the context (name, description,
+    dimensions) and each domain's keyword set. Contexts may appear in
+    more than one domain if they match multiple.
+    """
+    buckets: dict[str, list[dict]] = {name: [] for name, _ in domains}
+    unmatched: list[dict] = []
+    domain_keys = {name: _domain_keywords(name) for name, _ in domains}
+    for ctx in contexts:
+        haystack = " ".join([
+            ctx["name"].lower(),
+            ctx["description"].lower(),
+            " ".join(ctx.get("dimensions", [])).lower(),
+        ])
+        matched_any = False
+        for name, keys in domain_keys.items():
+            if any(kw in haystack for kw in keys):
+                buckets[name].append(ctx)
+                matched_any = True
+        if not matched_any:
+            unmatched.append(ctx)
+    buckets["__unmatched__"] = unmatched
+    return buckets
+
+
+def fmt_context_table(contexts: list[dict], limit: int = 12) -> str:
+    """Render a compact Markdown list of contexts. Used inside rule files
+    and under the SKILL.md verification block.
+    """
+    if not contexts:
+        return ""
+    lines: list[str] = []
+    for ctx in contexts[:limit]:
+        dims = ctx.get("dimensions") or []
+        dim_hint = ""
+        if dims:
+            visible = ", ".join(d for d in dims[:6] if d and "dimension per" not in d)
+            if visible:
+                dim_hint = f" Dimensions: {visible}."
+        desc = trim(ctx["description"], 120) if ctx["description"] else ""
+        unit = f" ({ctx['unit']})" if ctx["unit"] else ""
+        suffix = f"{desc}{unit}.{dim_hint}" if desc else f"Netdata context.{dim_hint}"
+        lines.append(wrap_line(f"- `{ctx['name']}`: ", suffix.strip()))
+    return "\n".join(lines)
 
 
 def slugify(s: str) -> str:
@@ -234,7 +456,9 @@ def fmt_skill_md(
     failures: list[tuple[str, str]],
     domains: list[tuple[str, list[tuple[str, str]]]],
     tags: list[str],
+    contexts: list[dict] | None = None,
 ) -> str:
+    contexts = contexts or []
     symptoms = top_symptoms(failures)
     desc = fmt_description(tech, symptoms, domains)
 
@@ -310,6 +534,16 @@ def fmt_skill_md(
         f"your {tech} instrumentation adds. Both paths end at the same "
         "MCP query surface."
     )
+    if contexts:
+        ctx_prefixes = sorted({c["name"].split(".", 1)[0] for c in contexts})
+        prefix_list = ", ".join(f"`{p}.*`" for p in ctx_prefixes[:4])
+        key_facts.append(
+            f"Netdata's {PLAYBOOK_TO_COLLECTOR.get(slug.replace(TROUBLESHOOT_PREFIX, ''), tech)} "
+            f"collector emits {len(contexts)} context(s) under "
+            f"{prefix_list}. The rule files enumerate which contexts "
+            "surface which domain; the Verification section below names "
+            "the load-bearing ones explicitly."
+        )
 
     # Step by step: use failure archetypes as ordered triage.
     def _step(idx: int, body: str) -> str:
@@ -406,38 +640,99 @@ def fmt_skill_md(
     ]
     mistakes_block = "\n".join(mistakes_lines)
 
-    # Verification: MCP pattern.
-    probe_metrics: list[str] = []
-    for _name, signals in domains[:2]:
-        for sig, _sev in signals[:3]:
-            probe_metrics.append(sanitize(sig))
-    metric_bullets = "\n".join(f"  - {m}" for m in probe_metrics[:6]) or (
-        "  - the specific signals listed in the domain rule files"
-    )
+    # Verification: real MCP queries with actual Netdata context names.
+    ctx_prefixes = sorted({c["name"].split(".", 1)[0] for c in contexts})
+    primary_prefix = ctx_prefixes[0] if ctx_prefixes else ""
 
-    verification_intro = wrap_plain(
-        f"Run these MCP queries against the Netdata instance that sees "
-        f"the {tech} service:"
-    )
-    verification_body = wrap_plain(
-        "A clean result means every key signal is within its expected "
-        "band and the `find_anomalous_metrics` list is empty or contains "
-        "only already-acknowledged items. If the fix was real, "
-        "re-running the same queries 10 minutes after applying it will "
-        "show a clean result. If it does not, revert and look deeper."
-    )
-    verification_block = (
-        f"{verification_intro}\n\n"
-        "```text\n"
-        f"1. list_metrics filtered by the {tech} service's context prefix.\n"
-        "2. query_metrics for the key signals from the first-triggered domain "
-        "over the last 30 minutes.\n"
-        "3. find_anomalous_metrics scoped to the same service/time window.\n"
-        "```\n\n"
-        "Signals the playbook considers load-bearing:\n\n"
-        f"{metric_bullets}\n\n"
-        f"{verification_body}"
-    )
+    # Pick the load-bearing contexts by giving availability/errors first,
+    # then throughput and resource. This biases Verification toward the
+    # handful of contexts most likely to move in an incident.
+    priority_buckets = ("availability", "errors", "throughput", "resource")
+    chosen: list[dict] = []
+    seen_names: set[str] = set()
+    if contexts:
+        bmap = classify_contexts_by_domain(contexts, [(b, []) for b in priority_buckets])
+        for bucket in priority_buckets:
+            for ctx in bmap.get(bucket, []):
+                if ctx["name"] not in seen_names:
+                    chosen.append(ctx)
+                    seen_names.add(ctx["name"])
+                if len(chosen) >= 6:
+                    break
+            if len(chosen) >= 6:
+                break
+        # Backfill if buckets missed; keep within 6.
+        for ctx in contexts:
+            if len(chosen) >= 6:
+                break
+            if ctx["name"] not in seen_names:
+                chosen.append(ctx)
+                seen_names.add(ctx["name"])
+
+    if chosen:
+        context_list_str = ", ".join(f"`{c['name']}`" for c in chosen)
+        prefix_clause = (
+            f"list_metrics filtered by q=\"{primary_prefix}\" "
+            f"(returns every {primary_prefix}.* context Netdata sees)"
+        ) if primary_prefix else "list_metrics with no filter"
+        probe_query = (
+            f"query_metrics with contexts=[{', '.join(c['name'] for c in chosen)}] "
+            "and relative_window=-30m"
+        )
+        anomaly_query = (
+            "find_anomalous_metrics filtered by node=<host> and "
+            f"context_pattern=\"{primary_prefix}.*\""
+        ) if primary_prefix else (
+            "find_anomalous_metrics filtered by node=<host>"
+        )
+        verification_intro = wrap_plain(
+            f"Run these MCP queries against the Netdata instance that "
+            f"sees the {tech} service. Every context listed below is a "
+            "real Netdata chart name; the agent does not need to guess."
+        )
+        verification_body = wrap_plain(
+            "A clean result means every context is within its expected "
+            "band and the `find_anomalous_metrics` list is empty or "
+            "contains only already-acknowledged items. If the fix was "
+            "real, re-running the same queries 10 minutes after "
+            "applying it will show a clean result. If it does not, "
+            "revert and look deeper."
+        )
+        verification_block = (
+            f"{verification_intro}\n\n"
+            "```text\n"
+            f"1. {prefix_clause}\n"
+            f"2. {probe_query}\n"
+            f"3. {anomaly_query}\n"
+            "```\n\n"
+            "Load-bearing contexts for this service:\n\n"
+            f"{fmt_context_table(chosen)}\n\n"
+            f"{verification_body}"
+        )
+    else:
+        # Fallback for techs without a Netdata-native collector mapping.
+        verification_intro = wrap_plain(
+            f"Netdata does not ship a native collector for {tech}; "
+            "discovery is dynamic. Run these MCP queries against the "
+            f"Netdata instance that sees the {tech} service."
+        )
+        verification_body = wrap_plain(
+            "If list_metrics returns nothing for this service, "
+            "instrumentation or scraping has not been set up yet. See "
+            "skills/netdata-otel-setup/ or the relevant Netdata "
+            "collector config reference."
+        )
+        verification_block = (
+            f"{verification_intro}\n\n"
+            "```text\n"
+            f"1. list_metrics with q=\"{slugify(tech)}\" to discover "
+            "contexts\n"
+            "2. query_metrics for each returned context over the last "
+            "30 minutes\n"
+            "3. find_anomalous_metrics scoped to the service or host\n"
+            "```\n\n"
+            f"{verification_body}"
+        )
 
     # References: one per domain file.
     ref_lines = []
@@ -448,19 +743,26 @@ def fmt_skill_md(
         ref_lines.append("- [`rules/overview.md`](./rules/overview.md)")
     ref_block = "\n".join(ref_lines)
 
+    example_ctx = chosen[0]["name"] if chosen else f"{slugify(tech)}.*"
+    discover_filter = (
+        f"list_metrics with q=\"{primary_prefix}\"" if primary_prefix
+        else f"list_metrics with q=\"{slugify(tech)}\""
+    )
     mcp_tips = (
         "### Handy MCP call templates\n\n"
         "```text\n"
         f"# Discover metrics from {tech}\n"
-        "list_metrics with optional filter by context prefix\n"
+        f"{discover_filter}\n"
         "\n"
-        "# Pull a specific signal over the last window\n"
-        "query_metrics with context=<signal>, relative_window=-15m\n"
+        "# Pull a specific context over the last window\n"
+        f"query_metrics with context=\"{example_ctx}\", relative_window=-15m\n"
         "\n"
         "# Rank anomalies for the service or host\n"
-        "find_anomalous_metrics with host=<host> or service=<service>\n"
+        "find_anomalous_metrics with node=<host> and context_pattern=\""
+        + (f"{primary_prefix}.*" if primary_prefix else f"{slugify(tech)}.*")
+        + "\"\n"
         "\n"
-        "# Correlate a known problem signal with others\n"
+        "# Correlate a known problem context with others\n"
         "find_correlated_metrics around the incident window\n"
         "\n"
         "# Show current alert state\n"
@@ -555,7 +857,9 @@ def fmt_domain_rule(
     domain_name: str,
     signals: list[tuple[str, str]],
     section_text: str,
+    matched_contexts: list[dict] | None = None,
 ) -> str:
+    matched_contexts = matched_contexts or []
     # Pull first paragraph under each signal as a short blurb.
     signal_blocks = []
     for sig_name, sev in signals:
@@ -699,25 +1003,63 @@ def fmt_domain_rule(
     ))
     lines.append("")
 
+    # Netdata contexts section: real chart names from metadata.yaml,
+    # pre-filtered to this domain. Empty block means we either have no
+    # Netdata collector mapping (e.g. Kafka) or the keyword filter
+    # matched nothing in this domain; the MCP examples below fall back
+    # to discovery-style calls in that case.
+    lines.append(f"## Netdata contexts that surface {domain_name}")
+    lines.append("")
+    if matched_contexts:
+        lines.append(wrap_plain(
+            "These are the real Netdata chart contexts the native "
+            f"collector emits for {tech}. Use these names verbatim in "
+            "`query_metrics` calls."
+        ))
+        lines.append("")
+        lines.append(fmt_context_table(matched_contexts))
+        lines.append("")
+    else:
+        lines.append(wrap_plain(
+            f"No Netdata-native contexts were classified into the "
+            f"{domain_name} domain for {tech}. Use discovery-style MCP "
+            "calls below, or consult the full context list in SKILL.md."
+        ))
+        lines.append("")
+
     lines.append("## MCP query examples for this domain")
     lines.append("")
     lines.append("```text")
-    lines.append("# Pull every signal in this domain at once")
-    lines.append(
-        "query_metrics with contexts=[<signals from the list above>] "
-        "and relative_window=-30m"
-    )
-    lines.append("")
-    lines.append("# Ask the agent to rank anomalies that match this domain")
-    lines.append(
-        "find_anomalous_metrics filtered by any attribute unique to the "
-        f"{tech} service (usually service.name or host.name)"
-    )
-    lines.append("")
-    lines.append("# Look for correlated signals outside this domain")
-    lines.append(
-        "find_correlated_metrics around the incident window, limit 15"
-    )
+    if matched_contexts:
+        names = [c["name"] for c in matched_contexts[:6]]
+        lines.append("# Pull every context in this domain at once")
+        lines.append(
+            f"query_metrics with contexts=[{', '.join(names)}] "
+            "and relative_window=-30m"
+        )
+        lines.append("")
+        prefix = matched_contexts[0]["name"].split(".", 1)[0]
+        lines.append("# Rank anomalies that match this domain")
+        lines.append(
+            f"find_anomalous_metrics with node=<host> and "
+            f"context_pattern=\"{prefix}.*\""
+        )
+        lines.append("")
+        lines.append("# Correlate a problem context with others outside the domain")
+        lines.append(
+            f"find_correlated_metrics around the incident window, "
+            f"anchor_context=\"{matched_contexts[0]['name']}\""
+        )
+    else:
+        lines.append("# Discover contexts for this service")
+        lines.append(
+            f"list_metrics with q=\"{slugify(tech)}\""
+        )
+        lines.append("")
+        lines.append("# Rank anomalies on the host running this service")
+        lines.append(
+            f"find_anomalous_metrics with node=<host>"
+        )
     lines.append("```")
     lines.append("")
     lines.append("## When to escalate out of this skill")
@@ -748,6 +1090,26 @@ def fmt_domain_rule(
     return "\n".join(lines)
 
 
+# Playbook text sometimes uses marketing-adjacent words the repo style
+# guide bans. Swap them for neutral equivalents as the text flows into
+# the generator. Keep this map in sync with BANNED_PHRASES in
+# scripts/validate.py; entries here exist because playbook prose has
+# historically tripped the validator on at least one technology.
+BANNED_PHRASE_REPLACEMENTS = [
+    ("cutting-edge", "current"),
+    ("game-changing", "meaningful"),
+    ("delve into", "work through"),
+    ("dive in", "start"),
+    ("I'd love to", ""),
+    ("seamlessly", "cleanly"),
+    ("leverage", "use"),
+    ("robustly", "reliably"),
+    ("robust", "reliable"),
+    ("powerful", "strong"),
+    ("genuinely", ""),
+]
+
+
 def sanitize(s: str) -> str:
     """Strip style-banned characters from extracted playbook text."""
     # An em-dash in the middle of a clause becomes a semicolon-like break.
@@ -760,6 +1122,14 @@ def sanitize(s: str) -> str:
     s = s.replace("\u2192", " then ")   # bare arrow
     s = s.replace("\u21d2", " then ")   # double arrow
     s = re.sub(r"(?<!-)--(?!-)", " -", s)  # double-hyphen -> single
+    # Replace banned phrases before collapsing whitespace.
+    for bad, good in BANNED_PHRASE_REPLACEMENTS:
+        s = re.sub(
+            rf"\b{re.escape(bad)}\b",
+            good,
+            s,
+            flags=re.IGNORECASE,
+        )
     # Collapse the resulting doubled punctuation.
     s = re.sub(r";\s*;", ";", s)
     s = re.sub(r"\s+;", ";", s)
@@ -831,7 +1201,8 @@ def generate() -> int:
     for pb in playbooks:
         text = pb.read_text(encoding="utf-8")
         tech = extract_title(text, pb.name)
-        slug = f"{TROUBLESHOOT_PREFIX}{slugify(pb.stem)}"
+        pb_slug = slugify(pb.stem)
+        slug = f"{TROUBLESHOOT_PREFIX}{pb_slug}"
 
         section0 = extract_section(text, SECTION0_RE, SECTION1_RE)
         section1 = extract_section(text, SECTION1_RE, SECTION2_RE)
@@ -844,10 +1215,18 @@ def generate() -> int:
             "netdata",
             "troubleshoot",
             "mcp",
-            slugify(pb.stem),
+            pb_slug,
         ]
 
-        skill_text = fmt_skill_md(tech, slug, intro, failures, domains, tags)
+        # Pull real Netdata contexts for this tech from the collector
+        # metadata.yaml. Empty list means no native collector mapping;
+        # the skill then teaches discovery-style MCP calls.
+        contexts = load_collector_contexts(pb_slug)
+        context_buckets = classify_contexts_by_domain(contexts, domains)
+
+        skill_text = fmt_skill_md(
+            tech, slug, intro, failures, domains, tags, contexts=contexts,
+        )
 
         skill_dir = SKILLS_DIR / slug
         write_if_changed(skill_dir / "SKILL.md", skill_text)
@@ -860,11 +1239,28 @@ def generate() -> int:
         if domains:
             for name, signals in domains:
                 dslug = slugify(name)
-                rule = fmt_domain_rule(tech, dslug, name, signals, section1)
+                matched = context_buckets.get(name, [])
+                rule = fmt_domain_rule(
+                    tech, dslug, name, signals, section1,
+                    matched_contexts=matched,
+                )
                 write_if_changed(skill_dir / "rules" / f"{dslug}.md", rule)
+            # If we have contexts that did not bucket into any playbook
+            # domain, emit an extra rule file so they are not lost. This
+            # is intentionally a single catch-all domain, not per-scope.
+            unmatched = context_buckets.get("__unmatched__", [])
+            if unmatched:
+                rule = fmt_domain_rule(
+                    tech, "other-contexts", "Other Netdata Contexts",
+                    [], section1, matched_contexts=unmatched,
+                )
+                write_if_changed(
+                    skill_dir / "rules" / "other-contexts.md", rule,
+                )
         else:
             rule = fmt_domain_rule(
-                tech, "overview", "Overview", [], section0 or ""
+                tech, "overview", "Overview", [], section0 or "",
+                matched_contexts=contexts,
             )
             write_if_changed(skill_dir / "rules" / "overview.md", rule)
 

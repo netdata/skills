@@ -111,17 +111,29 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Health & Critical Warnings
+
+These are the real Netdata chart contexts the native collector emits for NVMe. Use these names
+verbatim in `query_metrics` calls.
+
+- `nvme.device_critical_warnings_state`: Critical warnings state (state). Dimensions:
+                                         available_spare, temp_threshold, nvm_subsystem_reliability,
+                                         read_only, volatile_mem_backup_failed,
+                                         persistent_memory_read_only.
+- `nvme.device_critical_composite_temperature_time`: Critical composite temperature time (seconds).
+                                                     Dimensions: cctemp.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[nvme.device_critical_warnings_state, nvme.device_critical_composite_temperature_time] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the NVMe service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="nvme.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="nvme.device_critical_warnings_state"
 ```
 
 ## When to escalate out of this skill

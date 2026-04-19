@@ -80,17 +80,41 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Memory
+
+These are the real Netdata chart contexts the native collector emits for VMware vSphere. Use these
+names verbatim in `query_metrics` calls.
+
+- `vsphere.vm_mem_utilization`: Virtual Machine memory utilization (percentage). Dimensions: used.
+- `vsphere.vm_mem_usage`: Virtual Machine memory usage (KiB). Dimensions: granted, consumed, active,
+                          shared.
+- `vsphere.vm_mem_swap_usage`: Virtual Machine VMKernel memory swap usage (KiB). Dimensions:
+                               swapped.
+- `vsphere.vm_mem_swap_io`: Virtual Machine VMKernel memory swap IO (KiB/s). Dimensions: in, out.
+- `vsphere.host_mem_utilization`: ESXi Host memory utilization (percentage). Dimensions: used.
+- `vsphere.host_mem_usage`: ESXi Host memory usage (KiB). Dimensions: granted, consumed, active,
+                            shared, sharedcommon.
+- `vsphere.host_mem_swap_io`: ESXi Host VMKernel memory swap IO (KiB/s). Dimensions: in, out.
+- `vsphere.cluster_mem_capacity`: Cluster memory capacity (bytes). Dimensions: total, effective.
+- `vsphere.cluster_usage_mem`: Cluster DRS memory usage summary (MB). Dimensions: demand, entitled,
+                               reserved.
+- `vsphere.cluster_mem_utilization`: Cluster memory utilization (percentage). Dimensions: used.
+- `vsphere.cluster_mem_usage`: Cluster memory usage (KiB). Dimensions: consumed, active, granted,
+                               shared, overhead, swap_used.
+- `vsphere.cluster_services_fairness`: Cluster DRS resource distribution fairness (score).
+                                       Dimensions: cpu, memory.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[vsphere.vm_mem_utilization, vsphere.vm_mem_usage, vsphere.vm_mem_swap_usage, vsphere.vm_mem_swap_io, vsphere.host_mem_utilization, vsphere.host_mem_usage] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the VMware vSphere service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="vsphere.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="vsphere.vm_mem_utilization"
 ```
 
 ## When to escalate out of this skill

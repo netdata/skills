@@ -86,17 +86,33 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Control Plane Availability
+
+These are the real Netdata chart contexts the native collector emits for Kubernetes Cluster State.
+Use these names verbatim in `query_metrics` calls.
+
+- `k8s_state.node_condition`: Condition status (status). Dimensions: Ready, DiskPressure,
+                              MemoryPressure, NetworkUnavailable, PIDPressure.
+- `k8s_state.cronjob_jobs_count_by_status`: CronJob Jobs Count by Status (jobs). Dimensions:
+                                            completed, failed, running, suspended.
+- `k8s_state.cronjob_last_execution_status`: CronJob Last Execution Status (status). Dimensions:
+                                             completed, failed.
+- `k8s_state.cronjob_suspend_status`: CronJob Suspend Status (status). Dimensions: enabled,
+                                      suspended.
+- `k8s_state.pod_status_reason`: Status reason (status). Dimensions: Evicted, NodeAffinity,
+                                 NodeLost, Shutdown, UnexpectedAdmissionError, Other.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[k8s_state.node_condition, k8s_state.cronjob_jobs_count_by_status, k8s_state.cronjob_last_execution_status, k8s_state.cronjob_suspend_status, k8s_state.pod_status_reason] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Kubernetes Cluster State service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="k8s_state.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="k8s_state.node_condition"
 ```
 
 ## When to escalate out of this skill

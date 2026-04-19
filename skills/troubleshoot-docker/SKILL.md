@@ -45,6 +45,9 @@ tags:
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your Docker instrumentation adds. Both paths end at the same
   MCP query surface.
+- Netdata's docker collector emits 7 context(s) under `docker.*`. The rule files enumerate which
+  contexts surface which domain; the Verification section below names the load-bearing ones
+  explicitly.
 
 ## Step-by-step
 
@@ -76,15 +79,15 @@ tags:
 
 ```text
 # Discover metrics from Docker
-list_metrics with optional filter by context prefix
+list_metrics with q="docker"
 
-# Pull a specific signal over the last window
-query_metrics with context=<signal>, relative_window=-15m
+# Pull a specific context over the last window
+query_metrics with context="docker.containers_health_status", relative_window=-15m
 
 # Rank anomalies for the service or host
-find_anomalous_metrics with host=<host> or service=<service>
+find_anomalous_metrics with node=<host> and context_pattern="docker.*"
 
-# Correlate a known problem signal with others
+# Correlate a known problem context with others
 find_correlated_metrics around the incident window
 
 # Show current alert state
@@ -108,20 +111,32 @@ list_raised_alerts scoped to the node
 
 ## Verification
 
-Run these MCP queries against the Netdata instance that sees the Docker service:
+Run these MCP queries against the Netdata instance that sees the Docker service. Every context
+listed below is a real Netdata chart name; the agent does not need to guess.
 
 ```text
-1. list_metrics filtered by the Docker service's context prefix.
-2. query_metrics for the key signals from the first-triggered domain over the last 30 minutes.
-3. find_anomalous_metrics scoped to the same service/time window.
+1. list_metrics filtered by q="docker" (returns every docker.* context Netdata sees)
+2. query_metrics with contexts=[docker.containers_health_status, docker.container_health_status, docker.containers_state, docker.images, docker.images_size, docker.container_state] and relative_window=-30m
+3. find_anomalous_metrics filtered by node=<host> and context_pattern="docker.*"
 ```
 
-Signals the playbook considers load-bearing:
+Load-bearing contexts for this service:
 
-  - the specific signals listed in the domain rule files
+- `docker.containers_health_status`: Total number of Docker containers in various health states
+                                     (containers). Dimensions: healthy, unhealthy,
+                                     not_running_unhealthy, starting, no_healthcheck.
+- `docker.container_health_status`: Docker container health status (status). Dimensions: healthy,
+                                    unhealthy, not_running_unhealthy, starting, no_healthcheck.
+- `docker.containers_state`: Total number of Docker containers in various states (containers).
+                             Dimensions: running, paused, stopped.
+- `docker.images`: Total number of Docker images in various states (images). Dimensions: active,
+                   dangling.
+- `docker.images_size`: Total size of all Docker images (bytes). Dimensions: size.
+- `docker.container_state`: Docker container state (state). Dimensions: running, paused, exited,
+                            created, restarting, removing.
 
-A clean result means every key signal is within its expected band and the `find_anomalous_metrics`
-list is empty or contains only already-acknowledged items. If the fix was real, re-running the same
+A clean result means every context is within its expected band and the `find_anomalous_metrics` list
+is empty or contains only already-acknowledged items. If the fix was real, re-running the same
 queries 10 minutes after applying it will show a clean result. If it does not, revert and look
 deeper.
 

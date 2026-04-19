@@ -41,6 +41,9 @@ tags:
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your smartctl (S.M.A.R.T. Disk Health) instrumentation adds.
   Both paths end at the same MCP query surface.
+- Netdata's smartctl collector emits 10 context(s) under `smartctl.*`. The rule files enumerate
+  which contexts surface which domain; the Verification section below names the load-bearing ones
+  explicitly.
 
 ## Step-by-step
 
@@ -70,15 +73,15 @@ tags:
 
 ```text
 # Discover metrics from smartctl (S.M.A.R.T. Disk Health)
-list_metrics with optional filter by context prefix
+list_metrics with q="smartctl"
 
-# Pull a specific signal over the last window
-query_metrics with context=<signal>, relative_window=-15m
+# Pull a specific context over the last window
+query_metrics with context="smartctl.device_smart_status", relative_window=-15m
 
 # Rank anomalies for the service or host
-find_anomalous_metrics with host=<host> or service=<service>
+find_anomalous_metrics with node=<host> and context_pattern="smartctl.*"
 
-# Correlate a known problem signal with others
+# Correlate a known problem context with others
 find_correlated_metrics around the incident window
 
 # Show current alert state
@@ -103,20 +106,29 @@ list_raised_alerts scoped to the node
 ## Verification
 
 Run these MCP queries against the Netdata instance that sees the smartctl (S.M.A.R.T. Disk Health)
-service:
+service. Every context listed below is a real Netdata chart name; the agent does not need to guess.
 
 ```text
-1. list_metrics filtered by the smartctl (S.M.A.R.T. Disk Health) service's context prefix.
-2. query_metrics for the key signals from the first-triggered domain over the last 30 minutes.
-3. find_anomalous_metrics scoped to the same service/time window.
+1. list_metrics filtered by q="smartctl" (returns every smartctl.* context Netdata sees)
+2. query_metrics with contexts=[smartctl.device_smart_status, smartctl.device_ata_smart_error_log_count, smartctl.device_read_errors_rate, smartctl.device_write_errors_rate, smartctl.device_verify_errors_rate, smartctl.device_power_on_time] and relative_window=-30m
+3. find_anomalous_metrics filtered by node=<host> and context_pattern="smartctl.*"
 ```
 
-Signals the playbook considers load-bearing:
+Load-bearing contexts for this service:
 
-  - the specific signals listed in the domain rule files
+- `smartctl.device_smart_status`: Device smart status (status). Dimensions: passed, failed.
+- `smartctl.device_ata_smart_error_log_count`: Device ATA smart error log count (logs). Dimensions:
+                                               error_log.
+- `smartctl.device_read_errors_rate`: Device read errors (errors/s). Dimensions: corrected,
+                                      uncorrected.
+- `smartctl.device_write_errors_rate`: Device write errors (errors/s). Dimensions: corrected,
+                                       uncorrected.
+- `smartctl.device_verify_errors_rate`: Device verify errors (errors/s). Dimensions: corrected,
+                                        uncorrected.
+- `smartctl.device_power_on_time`: Device power on time (seconds). Dimensions: power_on_time.
 
-A clean result means every key signal is within its expected band and the `find_anomalous_metrics`
-list is empty or contains only already-acknowledged items. If the fix was real, re-running the same
+A clean result means every context is within its expected band and the `find_anomalous_metrics` list
+is empty or contains only already-acknowledged items. If the fix was real, re-running the same
 queries 10 minutes after applying it will show a clean result. If it does not, revert and look
 deeper.
 

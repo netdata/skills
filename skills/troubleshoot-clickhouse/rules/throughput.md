@@ -53,17 +53,38 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Throughput
+
+These are the real Netdata chart contexts the native collector emits for ClickHouse. Use these names
+verbatim in `query_metrics` calls.
+
+- `clickhouse.running_queries`: Running queries (queries). Dimensions: running.
+- `clickhouse.queries_preempted`: Queries waiting due to priority (queries). Dimensions: preempted.
+- `clickhouse.queries`: Queries (queries/s). Dimensions: successful, failed.
+- `clickhouse.select_queries`: Select queries (selects/s). Dimensions: successful, failed.
+- `clickhouse.insert_queries`: Insert queries (inserts/s). Dimensions: successful, failed.
+- `clickhouse.queries_memory_limit_exceeded`: Memory limit exceeded for query (queries/s).
+                                              Dimensions: mem_limit_exceeded.
+- `clickhouse.queries_latency`: Queries latency (microseconds). Dimensions: queries_time.
+- `clickhouse.select_queries_latency`: Select queries latency (microseconds). Dimensions:
+                                       selects_time.
+- `clickhouse.insert_queries_latency`: Insert queries latency (microseconds). Dimensions:
+                                       inserts_time.
+- `clickhouse.iops`: Read and write operations (ops/s). Dimensions: reads, writes.
+- `clickhouse.io_seeks`: lseek function calls (ops/s). Dimensions: lseek.
+- `clickhouse.merges`: Merge operations (ops/s). Dimensions: merge.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[clickhouse.running_queries, clickhouse.queries_preempted, clickhouse.queries, clickhouse.select_queries, clickhouse.insert_queries, clickhouse.queries_memory_limit_exceeded] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the ClickHouse service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="clickhouse.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="clickhouse.running_queries"
 ```
 
 ## When to escalate out of this skill

@@ -78,17 +78,38 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Disk Space
+
+These are the real Netdata chart contexts the native collector emits for MySQL. Use these names
+verbatim in `query_metrics` calls.
+
+- `mysql.tmp`: Tmp Operations (events/s). Dimensions: disk_tables, files, tables.
+- `mysql.innodb_buffer_pool_ops`: InnoDB Buffer Pool Operations (operations/s). Dimensions:
+                                  disk_reads, wait_free.
+- `mysql.key_disk_ops`: MyISAM Key Cache Disk Operations (operations/s). Dimensions: reads, writes.
+- `mysql.binlog_cache`: Binlog Cache (transactions/s). Dimensions: disk, all.
+- `mysql.binlog_stmt_cache`: Binlog Statement Cache (statements/s). Dimensions: disk, all.
+- `mysql.tmp`: Tmp Operations (events/s). Dimensions: disk_tables, files, tables.
+- `mysql.innodb_buffer_pool_ops`: InnoDB Buffer Pool Operations (operations/s). Dimensions:
+                                  disk_reads, wait_free.
+- `mysql.key_disk_ops`: MyISAM Key Cache Disk Operations (operations/s). Dimensions: reads, writes.
+- `mysql.binlog_cache`: Binlog Cache (transactions/s). Dimensions: disk, all.
+- `mysql.binlog_stmt_cache`: Binlog Statement Cache (statements/s). Dimensions: disk, all.
+- `mysql.tmp`: Tmp Operations (events/s). Dimensions: disk_tables, files, tables.
+- `mysql.innodb_buffer_pool_ops`: InnoDB Buffer Pool Operations (operations/s). Dimensions:
+                                  disk_reads, wait_free.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[mysql.tmp, mysql.innodb_buffer_pool_ops, mysql.key_disk_ops, mysql.binlog_cache, mysql.binlog_stmt_cache, mysql.tmp] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the MySQL service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="mysql.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="mysql.tmp"
 ```
 
 ## When to escalate out of this skill

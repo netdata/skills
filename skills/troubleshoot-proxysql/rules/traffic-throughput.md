@@ -59,17 +59,44 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Traffic & Throughput
+
+These are the real Netdata chart contexts the native collector emits for Proxysql. Use these names
+verbatim in `query_metrics` calls.
+
+- `proxysql.client_connections_rate`: Client connections rate (connections/s). Dimensions: created,
+                                      aborted.
+- `proxysql.server_connections_rate`: Server connections rate (connections/s). Dimensions: created,
+                                      aborted, delayed.
+- `proxysql.backends_traffic`: Backends traffic (B/s). Dimensions: recv, sent.
+- `proxysql.clients_traffic`: Clients traffic (B/s). Dimensions: recv, sent.
+- `proxysql.questions_rate`: Client requests / statements executed (questions/s). Dimensions:
+                             questions.
+- `proxysql.slow_queries_rate`: Slow queries (queries/s). Dimensions: slow.
+- `proxysql.queries_rate`: Queries rate (queries/s). Dimensions: autocommit, autocommit_filtered,
+                           commit_filtered, rollback, rollback_filtered, backend_change_user.
+- `proxysql.backend_statements_rate`: Statements executed against the backends (statements/s).
+                                      Dimensions: prepare, execute, close.
+- `proxysql.client_statements_rate`: Statements executed by clients (statements/s). Dimensions:
+                                     prepare, execute, close.
+- `proxysql.query_cache_requests_rate`: Query Cache requests (requests/s). Dimensions: read, write,
+                                        read_success.
+- `proxysql.mysql_monitor_workers_rate`: MySQL monitor workers rate (workers/s). Dimensions:
+                                         started.
+- `proxysql.mysql_monitor_connect_checks_rate`: MySQL monitor connect checks (checks/s). Dimensions:
+                                                succeed, failed.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[proxysql.client_connections_rate, proxysql.server_connections_rate, proxysql.backends_traffic, proxysql.clients_traffic, proxysql.questions_rate, proxysql.slow_queries_rate] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Proxysql service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="proxysql.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="proxysql.client_connections_rate"
 ```
 
 ## When to escalate out of this skill

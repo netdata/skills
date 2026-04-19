@@ -57,6 +57,9 @@ tags:
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your HAProxy instrumentation adds. Both paths end at the same
   MCP query surface.
+- Netdata's haproxy collector emits 7 context(s) under `haproxy.*`. The rule files enumerate which
+  contexts surface which domain; the Verification section below names the load-bearing ones
+  explicitly.
 
 ## Step-by-step
 
@@ -95,15 +98,15 @@ tags:
 
 ```text
 # Discover metrics from HAProxy
-list_metrics with optional filter by context prefix
+list_metrics with q="haproxy"
 
-# Pull a specific signal over the last window
-query_metrics with context=<signal>, relative_window=-15m
+# Pull a specific context over the last window
+query_metrics with context="haproxy.backend_response_time_average", relative_window=-15m
 
 # Rank anomalies for the service or host
-find_anomalous_metrics with host=<host> or service=<service>
+find_anomalous_metrics with node=<host> and context_pattern="haproxy.*"
 
-# Correlate a known problem signal with others
+# Correlate a known problem context with others
 find_correlated_metrics around the incident window
 
 # Show current alert state
@@ -127,25 +130,28 @@ list_raised_alerts scoped to the node
 
 ## Verification
 
-Run these MCP queries against the Netdata instance that sees the HAProxy service:
+Run these MCP queries against the Netdata instance that sees the HAProxy service. Every context
+listed below is a real Netdata chart name; the agent does not need to guess.
 
 ```text
-1. list_metrics filtered by the HAProxy service's context prefix.
-2. query_metrics for the key signals from the first-triggered domain over the last 30 minutes.
-3. find_anomalous_metrics scoped to the same service/time window.
+1. list_metrics filtered by q="haproxy" (returns every haproxy.* context Netdata sees)
+2. query_metrics with contexts=[haproxy.backend_response_time_average, haproxy.backend_queue_time_average, haproxy.backend_sessions, haproxy.backend_current_queue, haproxy.backend_network_io, haproxy.backend_current_sessions] and relative_window=-30m
+3. find_anomalous_metrics filtered by node=<host> and context_pattern="haproxy.*"
 ```
 
-Signals the playbook considers load-bearing:
+Load-bearing contexts for this service:
 
-  - Process Liveness
-  - Backend Server Health Status
-  - Backend Aggregate Status
-  - Frontend Session Rate
-  - HTTP Request Rate
-  - Bytes In / Bytes Out
+- `haproxy.backend_response_time_average`: Average response time for last 1024 successful
+                                           connections (milliseconds).
+- `haproxy.backend_queue_time_average`: Average queue time for last 1024 successful connections
+                                        (milliseconds).
+- `haproxy.backend_sessions`: Sessions rate (sessions/s).
+- `haproxy.backend_current_queue`: Current number of queued requests (requests).
+- `haproxy.backend_network_io`: Network traffic (bytes/s). Dimensions: in, out.
+- `haproxy.backend_current_sessions`: Current number of active sessions (sessions).
 
-A clean result means every key signal is within its expected band and the `find_anomalous_metrics`
-list is empty or contains only already-acknowledged items. If the fix was real, re-running the same
+A clean result means every context is within its expected band and the `find_anomalous_metrics` list
+is empty or contains only already-acknowledged items. If the fix was real, re-running the same
 queries 10 minutes after applying it will show a clean result. If it does not, revert and look
 deeper.
 

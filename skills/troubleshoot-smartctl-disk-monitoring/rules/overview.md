@@ -47,17 +47,40 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Overview
+
+These are the real Netdata chart contexts the native collector emits for smartctl (S.M.A.R.T. Disk
+Health). Use these names verbatim in `query_metrics` calls.
+
+- `smartctl.device_smart_status`: Device smart status (status). Dimensions: passed, failed.
+- `smartctl.device_ata_smart_error_log_count`: Device ATA smart error log count (logs). Dimensions:
+                                               error_log.
+- `smartctl.device_power_on_time`: Device power on time (seconds). Dimensions: power_on_time.
+- `smartctl.device_temperature`: Device temperature (Celsius). Dimensions: temperature.
+- `smartctl.device_power_cycles_count`: Device power cycles (cycles). Dimensions: power.
+- `smartctl.device_read_errors_rate`: Device read errors (errors/s). Dimensions: corrected,
+                                      uncorrected.
+- `smartctl.device_write_errors_rate`: Device write errors (errors/s). Dimensions: corrected,
+                                       uncorrected.
+- `smartctl.device_verify_errors_rate`: Device verify errors (errors/s). Dimensions: corrected,
+                                        uncorrected.
+- `smartctl.device_smart_attr_{attribute_name}`: Device smart attribute {attribute_name}
+                                                 ({attribute_unit}). Dimensions: {attribute_name}.
+- `smartctl.device_smart_attr_{attribute_name}_normalized`: Device smart attribute {attribute_name}
+                                                            normalized (value). Dimensions:
+                                                            {attribute_name}.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[smartctl.device_smart_status, smartctl.device_ata_smart_error_log_count, smartctl.device_power_on_time, smartctl.device_temperature, smartctl.device_power_cycles_count, smartctl.device_read_errors_rate] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the smartctl (S.M.A.R.T. Disk Health) service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="smartctl.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="smartctl.device_smart_status"
 ```
 
 ## When to escalate out of this skill

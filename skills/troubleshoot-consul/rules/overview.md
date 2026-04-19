@@ -46,17 +46,42 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Overview
+
+These are the real Netdata chart contexts the native collector emits for Consul. Use these names
+verbatim in `query_metrics` calls.
+
+- `consul.client_rpc_requests_rate`: Client RPC requests (requests/s). Dimensions: rpc.
+- `consul.client_rpc_requests_exceeded_rate`: Client rate-limited RPC requests (requests/s).
+                                              Dimensions: exceeded.
+- `consul.client_rpc_requests_failed_rate`: Client failed RPC requests (requests/s). Dimensions:
+                                            failed.
+- `consul.memory_allocated`: Memory allocated by the Consul process (bytes). Dimensions: allocated.
+- `consul.memory_sys`: Memory obtained from the OS (bytes). Dimensions: sys.
+- `consul.gc_pause_time`: Garbage collection stop-the-world pause time (seconds). Dimensions:
+                          gc_pause.
+- `consul.kvs_apply_time`: KVS apply time (ms). Dimensions: quantile_0.5, quantile_0.9,
+                           quantile_0.99.
+- `consul.kvs_apply_operations_rate`: KVS apply operations (ops/s). Dimensions: kvs_apply.
+- `consul.txn_apply_time`: Transaction apply time (ms). Dimensions: quantile_0.5, quantile_0.9,
+                           quantile_0.99.
+- `consul.txn_apply_operations_rate`: Transaction apply operations (ops/s). Dimensions: txn_apply.
+- `consul.autopilot_health_status`: Autopilot cluster health status (status). Dimensions: healthy,
+                                    unhealthy.
+- `consul.autopilot_failure_tolerance`: Autopilot cluster failure tolerance (servers). Dimensions:
+                                        failure_tolerance.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[consul.client_rpc_requests_rate, consul.client_rpc_requests_exceeded_rate, consul.client_rpc_requests_failed_rate, consul.memory_allocated, consul.memory_sys, consul.gc_pause_time] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Consul service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="consul.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="consul.client_rpc_requests_rate"
 ```
 
 ## When to escalate out of this skill

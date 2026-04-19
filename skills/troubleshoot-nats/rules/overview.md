@@ -46,17 +46,35 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Overview
+
+These are the real Netdata chart contexts the native collector emits for NATS. Use these names
+verbatim in `query_metrics` calls.
+
+- `nats.server_traffic`: Server Traffic (bytes/s). Dimensions: received, sent.
+- `nats.server_messages`: Server Messages (messages/s). Dimensions: received, sent.
+- `nats.server_connections`: Server Active Connections (connections). Dimensions: active.
+- `nats.server_connections_rate`: Server Connections (connections/s). Dimensions: connections.
+- `nats.server_health_probe_status`: Server Health Probe Status (status). Dimensions: ok, error.
+- `nats.server_cpu_usage`: Server CPU Usage (percent). Dimensions: used.
+- `nats.server_mem_usage`: Server Memory Usage (bytes). Dimensions: used.
+- `nats.server_uptime`: Server Uptime (seconds). Dimensions: uptime.
+- `nats.jetstream_streams`: JetStream Streams (streams). Dimensions: active.
+- `nats.jetstream_streams_storage_bytes`: JetStream Bytes (bytes). Dimensions: used.
+- `nats.jetstream_streams_storage_messages`: JetStream Messages (messaged). Dimensions: stored.
+- `nats.jetstream_consumers`: JetStream Consumers (consumers). Dimensions: active.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[nats.server_traffic, nats.server_messages, nats.server_connections, nats.server_connections_rate, nats.server_health_probe_status, nats.server_cpu_usage] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the NATS service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="nats.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="nats.server_traffic"
 ```
 
 ## When to escalate out of this skill

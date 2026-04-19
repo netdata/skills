@@ -57,17 +57,34 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Latency
+
+These are the real Netdata chart contexts the native collector emits for Apache Cassandra. Use these
+names verbatim in `query_metrics` calls.
+
+- `cassandra.client_request_read_latency_histogram`: Client request read latency histogram
+                                                     (seconds). Dimensions: p50, p75, p95, p98, p99,
+                                                     p999.
+- `cassandra.client_request_write_latency_histogram`: Client request write latency histogram
+                                                      (seconds). Dimensions: p50, p75, p95, p98,
+                                                      p99, p999.
+- `cassandra.client_requests_latency`: Client requests total latency (seconds). Dimensions: read,
+                                       write.
+- `cassandra.jvm_gc_time`: Garbage collection time (seconds). Dimensions: parnew, cms.
+- `cassandra.client_requests_timeouts_rate`: Client requests timeouts rate (timeout/s). Dimensions:
+                                             read, write.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[cassandra.client_request_read_latency_histogram, cassandra.client_request_write_latency_histogram, cassandra.client_requests_latency, cassandra.jvm_gc_time, cassandra.client_requests_timeouts_rate] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Apache Cassandra service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="cassandra.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="cassandra.client_request_read_latency_histogram"
 ```
 
 ## When to escalate out of this skill

@@ -82,17 +82,42 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Bookkeeper Storage Internals
+
+These are the real Netdata chart contexts the native collector emits for Apache Pulsar. Use these
+names verbatim in `query_metrics` calls.
+
+- `pulsar.broker_components`: Broker Components (components). Dimensions: namespaces, topics,
+                              subscriptions, producers, consumers.
+- `pulsar.storage_size`: Storage Size (KiB). Dimensions: used.
+- `pulsar.storage_operations_rate`: Storage Read/Write Operations Rate (message batches/s).
+                                    Dimensions: read, write.
+- `pulsar.storage_write_latency`: Storage Write Latency (entries/s). Dimensions: <=0.5ms, <=1ms,
+                                  <=5ms, =10ms, <=20ms, <=50ms.
+- `pulsar.subscription_delayed`: Subscriptions Delayed for Dispatching (message batches).
+                                 Dimensions: delayed.
+- `pulsar.subscription_msg_rate_redeliver`: Subscriptions Redelivered Message Rate (messages/s).
+                                            Dimensions: redelivered.
+- `pulsar.subscription_blocked_on_unacked_messages`: Subscriptions Blocked On Unacked Messages
+                                                     (subscriptions). Dimensions: blocked.
+- `pulsar.replication_rate`: Replication Rate (messages/s). Dimensions: in, out.
+- `pulsar.replication_throughput_rate`: Replication Throughput Rate (KiB/s). Dimensions: in, out.
+- `pulsar.replication_backlog`: Replication Backlog (messages). Dimensions: backlog.
+- `pulsar.namespace_broker_components`: Broker Components (components). Dimensions: topics,
+                                        subscriptions, producers, consumers.
+- `pulsar.namespace_messages_rate`: Messages Rate (messages/s). Dimensions: publish, dispatch.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[pulsar.broker_components, pulsar.storage_size, pulsar.storage_operations_rate, pulsar.storage_write_latency, pulsar.subscription_delayed, pulsar.subscription_msg_rate_redeliver] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Apache Pulsar service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="pulsar.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="pulsar.broker_components"
 ```
 
 ## When to escalate out of this skill

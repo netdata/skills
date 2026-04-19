@@ -48,6 +48,9 @@ tags:
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your Apache HTTPD instrumentation adds. Both paths end at the
   same MCP query surface.
+- Netdata's apache collector emits 20 context(s) under `apache.*`. The rule files enumerate which
+  contexts surface which domain; the Verification section below names the load-bearing ones
+  explicitly.
 
 ## Step-by-step
 
@@ -81,15 +84,15 @@ tags:
 
 ```text
 # Discover metrics from Apache HTTPD
-list_metrics with optional filter by context prefix
+list_metrics with q="apache"
 
-# Pull a specific signal over the last window
-query_metrics with context=<signal>, relative_window=-15m
+# Pull a specific context over the last window
+query_metrics with context="apache.connections", relative_window=-15m
 
 # Rank anomalies for the service or host
-find_anomalous_metrics with host=<host> or service=<service>
+find_anomalous_metrics with node=<host> and context_pattern="apache.*"
 
-# Correlate a known problem signal with others
+# Correlate a known problem context with others
 find_correlated_metrics around the incident window
 
 # Show current alert state
@@ -113,24 +116,28 @@ list_raised_alerts scoped to the node
 
 ## Verification
 
-Run these MCP queries against the Netdata instance that sees the Apache HTTPD service:
+Run these MCP queries against the Netdata instance that sees the Apache HTTPD service. Every context
+listed below is a real Netdata chart name; the agent does not need to guess.
 
 ```text
-1. list_metrics filtered by the Apache HTTPD service's context prefix.
-2. query_metrics for the key signals from the first-triggered domain over the last 30 minutes.
-3. find_anomalous_metrics scoped to the same service/time window.
+1. list_metrics filtered by q="apache" (returns every apache.* context Netdata sees)
+2. query_metrics with contexts=[apache.connections, apache.conns_async, apache.scoreboard, apache.uptime, apache.requests, apache.reqpersec] and relative_window=-30m
+3. find_anomalous_metrics filtered by node=<host> and context_pattern="apache.*"
 ```
 
-Signals the playbook considers load-bearing:
+Load-bearing contexts for this service:
 
-  - Process Presence
-  - Critical-Path Reachability
-  - Configuration Reload Success
-  - Requests Per Second
-  - Bytes Served Per Second
+- `apache.connections`: Connections (connections). Dimensions: connections.
+- `apache.conns_async`: Active Connections (connections). Dimensions: keepalive, closing, writing.
+- `apache.scoreboard`: Scoreboard (connections). Dimensions: waiting, starting, reading, sending,
+                       keepalive, dns_lookup.
+- `apache.uptime`: Uptime (seconds). Dimensions: uptime.
+- `apache.requests`: Requests (requests/s). Dimensions: requests.
+- `apache.reqpersec`: Lifetime Average Number Of Requests Per Second (requests/s). Dimensions:
+                      requests.
 
-A clean result means every key signal is within its expected band and the `find_anomalous_metrics`
-list is empty or contains only already-acknowledged items. If the fix was real, re-running the same
+A clean result means every context is within its expected band and the `find_anomalous_metrics` list
+is empty or contains only already-acknowledged items. If the fix was real, re-running the same
 queries 10 minutes after applying it will show a clean result. If it does not, revert and look
 deeper.
 

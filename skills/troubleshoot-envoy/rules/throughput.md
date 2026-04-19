@@ -63,17 +63,49 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Throughput
+
+These are the real Netdata chart contexts the native collector emits for Envoy. Use these names
+verbatim in `query_metrics` calls.
+
+- `envoy.cluster_manager_cluster_changes_rate`: Cluster manager cluster changes (clusters/s).
+                                                Dimensions: added, modified, removed.
+- `envoy.cluster_manager_cluster_updates_rate`: Cluster manager updates (updates/s). Dimensions:
+                                                cluster.
+- `envoy.cluster_manager_cluster_updated_via_merge_rate`: Cluster manager updates applied as merged
+                                                          updates (updates/s). Dimensions:
+                                                          via_merge.
+- `envoy.cluster_manager_update_merge_cancelled_rate`: Cluster manager cancelled merged updates
+                                                       (updates/s). Dimensions: merge_cancelled.
+- `envoy.cluster_manager_update_out_of_merge_window_rate`: Cluster manager out of a merge window
+                                                           updates (updates/s). Dimensions:
+                                                           out_of_merge_window.
+- `envoy.cluster_membership_changes_rate`: Cluster membership changes (changes/s). Dimensions:
+                                           membership.
+- `envoy.cluster_membership_updates_rate`: Cluster membership updates (updates/s). Dimensions:
+                                           success, failure, empty, no_rebuild.
+- `envoy.cluster_upstream_cx_rate`: Cluster upstream connections (connections/s). Dimensions:
+                                    created.
+- `envoy.cluster_upstream_cx_http_rate`: Cluster upstream connections by HTTP version
+                                         (connections/s). Dimensions: http1, http2, http3.
+- `envoy.cluster_upstream_cx_destroy_rate`: Cluster upstream destroyed connections (connections/s).
+                                            Dimensions: local, remote.
+- `envoy.cluster_upstream_cx_connect_fail_rate`: Cluster upstream failed connections
+                                                 (connections/s). Dimensions: failed.
+- `envoy.cluster_upstream_cx_connect_timeout_rate`: Cluster upstream timed out connections
+                                                    (connections/s). Dimensions: timeout.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[envoy.cluster_manager_cluster_changes_rate, envoy.cluster_manager_cluster_updates_rate, envoy.cluster_manager_cluster_updated_via_merge_rate, envoy.cluster_manager_update_merge_cancelled_rate, envoy.cluster_manager_update_out_of_merge_window_rate, envoy.cluster_membership_changes_rate] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Envoy service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="envoy.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="envoy.cluster_manager_cluster_changes_rate"
 ```
 
 ## When to escalate out of this skill

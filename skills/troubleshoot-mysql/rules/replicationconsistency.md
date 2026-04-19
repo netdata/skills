@@ -67,17 +67,39 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Replication/Consistency
+
+These are the real Netdata chart contexts the native collector emits for MySQL. Use these names
+verbatim in `query_metrics` calls.
+
+- `mysql.galera_writesets`: Replicated Writesets (writesets/s). Dimensions: rx, tx.
+- `mysql.galera_bytes`: Replicated Bytes (KiB/s). Dimensions: rx, tx.
+- `mysql.galera_conflicts`: Replication Conflicts (transactions). Dimensions: bf_aborts, cert_fails.
+- `mysql.galera_cluster_status`: Cluster Component Status (status). Dimensions: primary,
+                                 non_primary, disconnected.
+- `mysql.galera_cluster_state`: Cluster Component State (state). Dimensions: undefined, joining,
+                                donor, joined, synced, error.
+- `mysql.galera_cluster_size`: Number of Nodes in the Cluster (nodes). Dimensions: nodes.
+- `mysql.galera_cluster_weight`: The Total Weight of the Current Members in the Cluster (weight).
+                                 Dimensions: weight.
+- `mysql.galera_connected`: Cluster Connection Status (boolean). Dimensions: connected.
+- `mysql.slave_behind`: Slave Behind Seconds (seconds). Dimensions: seconds.
+- `mysql.slave_status`: I/O / SQL Thread Running State (boolean). Dimensions: sql_running,
+                        io_running.
+- `mysql.galera_writesets`: Replicated Writesets (writesets/s). Dimensions: rx, tx.
+- `mysql.galera_bytes`: Replicated Bytes (KiB/s). Dimensions: rx, tx.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[mysql.galera_writesets, mysql.galera_bytes, mysql.galera_conflicts, mysql.galera_cluster_status, mysql.galera_cluster_state, mysql.galera_cluster_size] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the MySQL service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="mysql.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="mysql.galera_writesets"
 ```
 
 ## When to escalate out of this skill

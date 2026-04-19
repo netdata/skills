@@ -66,17 +66,37 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Hardware & Host Health
+
+These are the real Netdata chart contexts the native collector emits for VMware vSphere. Use these
+names verbatim in `query_metrics` calls.
+
+- `vsphere.host_cpu_utilization`: ESXi Host CPU utilization (percentage). Dimensions: used.
+- `vsphere.host_mem_utilization`: ESXi Host memory utilization (percentage). Dimensions: used.
+- `vsphere.host_mem_usage`: ESXi Host memory usage (KiB). Dimensions: granted, consumed, active,
+                            shared, sharedcommon.
+- `vsphere.host_mem_swap_io`: ESXi Host VMKernel memory swap IO (KiB/s). Dimensions: in, out.
+- `vsphere.host_disk_io`: ESXi Host disk IO (KiB/s). Dimensions: read, write.
+- `vsphere.host_disk_max_latency`: ESXi Host disk max latency (milliseconds). Dimensions: latency.
+- `vsphere.host_net_traffic`: ESXi Host network traffic (KiB/s). Dimensions: received, sent.
+- `vsphere.host_net_packets`: ESXi Host network packets (packets). Dimensions: received, sent.
+- `vsphere.host_net_drops`: ESXi Host network drops (packets). Dimensions: received, sent.
+- `vsphere.host_net_errors`: ESXi Host network errors (errors). Dimensions: received, sent.
+- `vsphere.host_overall_status`: ESXi Host overall alarm status (status). Dimensions: green, red,
+                                 yellow, gray.
+- `vsphere.host_system_uptime`: ESXi Host system uptime (seconds). Dimensions: uptime.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[vsphere.host_cpu_utilization, vsphere.host_mem_utilization, vsphere.host_mem_usage, vsphere.host_mem_swap_io, vsphere.host_disk_io, vsphere.host_disk_max_latency] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the VMware vSphere service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="vsphere.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="vsphere.host_cpu_utilization"
 ```
 
 ## When to escalate out of this skill

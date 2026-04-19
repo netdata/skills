@@ -96,17 +96,27 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Errors & Integrity
+
+These are the real Netdata chart contexts the native collector emits for Apache ZooKeeper. Use these
+names verbatim in `query_metrics` calls.
+
+- `zookeeper.stale_requests_dropped`: Stale Requests Dropped (requests/s). Dimensions: dropped.
+- `zookeeper.connections_dropped`: Dropped Connections (connections/s). Dimensions: dropped.
+- `zookeeper.connections_rejected`: Rejected Connections (connections/s). Dimensions: rejected.
+- `zookeeper.auth_fails`: Auth Fails (fails/s). Dimensions: auth.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[zookeeper.stale_requests_dropped, zookeeper.connections_dropped, zookeeper.connections_rejected, zookeeper.auth_fails] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Apache ZooKeeper service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="zookeeper.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="zookeeper.stale_requests_dropped"
 ```
 
 ## When to escalate out of this skill

@@ -47,17 +47,36 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Overview
+
+These are the real Netdata chart contexts the native collector emits for Microsoft SQL Server. Use
+these names verbatim in `query_metrics` calls.
+
+- `mssql.user_connections`: User Connections (connections). Dimensions: user.
+- `mssql.session_connections`: Session Connections (connections). Dimensions: user, internal.
+- `mssql.blocked_processes`: Blocked Processes (processes). Dimensions: blocked.
+- `mssql.batch_requests`: Batch Requests (requests/s). Dimensions: batch.
+- `mssql.compilations`: SQL Compilations (compilations/s). Dimensions: compilations.
+- `mssql.recompilations`: SQL Re-Compilations (recompilations/s). Dimensions: recompilations.
+- `mssql.auto_param_attempts`: Auto-Parameterization Attempts (attempts/s). Dimensions: total, safe,
+                               failed.
+- `mssql.sql_errors`: SQL Errors (errors/s). Dimensions: errors.
+- `mssql.buffer_cache_hit_ratio`: Buffer Cache Hit Ratio (percentage). Dimensions: hit_ratio.
+- `mssql.buffer_page_life_expectancy`: Page Life Expectancy (seconds). Dimensions: life_expectancy.
+- `mssql.buffer_page_iops`: Buffer Page I/O (pages/s). Dimensions: read, written.
+- `mssql.buffer_checkpoint_pages`: Buffer Checkpoint Pages Flushed (pages/s). Dimensions: flushed.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[mssql.user_connections, mssql.session_connections, mssql.blocked_processes, mssql.batch_requests, mssql.compilations, mssql.recompilations] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Microsoft SQL Server service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="mssql.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="mssql.user_connections"
 ```
 
 ## When to escalate out of this skill

@@ -52,6 +52,9 @@ tags:
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your MongoDB instrumentation adds. Both paths end at the same
   MCP query surface.
+- Netdata's mongodb collector emits 53 context(s) under `mongodb.*`. The rule files enumerate which
+  contexts surface which domain; the Verification section below names the load-bearing ones
+  explicitly.
 
 ## Step-by-step
 
@@ -90,15 +93,15 @@ tags:
 
 ```text
 # Discover metrics from MongoDB
-list_metrics with optional filter by context prefix
+list_metrics with q="mongodb"
 
-# Pull a specific signal over the last window
-query_metrics with context=<signal>, relative_window=-15m
+# Pull a specific context over the last window
+query_metrics with context="mongodb.operations_by_type_rate", relative_window=-15m
 
 # Rank anomalies for the service or host
-find_anomalous_metrics with host=<host> or service=<service>
+find_anomalous_metrics with node=<host> and context_pattern="mongodb.*"
 
-# Correlate a known problem signal with others
+# Correlate a known problem context with others
 find_correlated_metrics around the incident window
 
 # Show current alert state
@@ -122,20 +125,30 @@ list_raised_alerts scoped to the node
 
 ## Verification
 
-Run these MCP queries against the Netdata instance that sees the MongoDB service:
+Run these MCP queries against the Netdata instance that sees the MongoDB service. Every context
+listed below is a real Netdata chart name; the agent does not need to guess.
 
 ```text
-1. list_metrics filtered by the MongoDB service's context prefix.
-2. query_metrics for the key signals from the first-triggered domain over the last 30 minutes.
-3. find_anomalous_metrics scoped to the same service/time window.
+1. list_metrics filtered by q="mongodb" (returns every mongodb.* context Netdata sees)
+2. query_metrics with contexts=[mongodb.operations_by_type_rate, mongodb.document_operations_rate, mongodb.active_clients_count, mongodb.connections_usage, mongodb.connections_by_state_count, mongodb.connections_rate] and relative_window=-30m
+3. find_anomalous_metrics filtered by node=<host> and context_pattern="mongodb.*"
 ```
 
-Signals the playbook considers load-bearing:
+Load-bearing contexts for this service:
 
-  - the specific signals listed in the domain rule files
+- `mongodb.operations_by_type_rate`: Operations by type (operations/s). Dimensions: insert, query,
+                                     update, delete, getmore, command.
+- `mongodb.document_operations_rate`: Document operations (operations/s). Dimensions: inserted,
+                                      deleted, returned, updated.
+- `mongodb.active_clients_count`: Connected clients (clients). Dimensions: readers, writers.
+- `mongodb.connections_usage`: Connections usage (connections). Dimensions: available, used.
+- `mongodb.connections_by_state_count`: Connections By State (connections). Dimensions: active,
+                                        threaded, exhaust_is_master, exhaust_hello,
+                                        awaiting_topology_changes.
+- `mongodb.connections_rate`: Connections Rate (connections/s). Dimensions: created.
 
-A clean result means every key signal is within its expected band and the `find_anomalous_metrics`
-list is empty or contains only already-acknowledged items. If the fix was real, re-running the same
+A clean result means every context is within its expected band and the `find_anomalous_metrics` list
+is empty or contains only already-acknowledged items. If the fix was real, re-running the same
 queries 10 minutes after applying it will show a clean result. If it does not, revert and look
 deeper.
 

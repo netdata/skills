@@ -68,17 +68,40 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Queue Depth
+
+These are the real Netdata chart contexts the native collector emits for RabbitMQ. Use these names
+verbatim in `query_metrics` calls.
+
+- `rabbitmq.messages_count`: Messages (messages). Dimensions: ready, unacknowledged.
+- `rabbitmq.messages_rate`: Messages (messages/s). Dimensions: ack, publish, publish_in,
+                            publish_out, confirm, deliver.
+- `rabbitmq.objects_count`: Objects (messages). Dimensions: channels, consumers, connections,
+                            queues, exchanges.
+- `rabbitmq.queue_churn_rate`: Queue churn (operations/s). Dimensions: created, deleted, declared.
+- `rabbitmq.node_erlang_run_queue_processes_count`: Node Erlang Run Queue (processes). Dimensions:
+                                                    length.
+- `rabbitmq.vhost_messages_count`: Vhost messages (messages). Dimensions: ready, unacknowledged.
+- `rabbitmq.vhost_messages_rate`: Vhost messages rate (messages/s). Dimensions: ack, publish,
+                                  publish_in, publish_out, confirm, deliver.
+- `rabbitmq.queue_status`: Queue status (status). Dimensions: running, down, idle, crashed, stopped,
+                           minority.
+- `rabbitmq.queue_messages_count`: Queue messages (messages). Dimensions: ready, unacknowledged,
+                                   paged_out, persistent.
+- `rabbitmq.queue_messages_rate`: Queue messages rate (messages/s). Dimensions: ack, publish,
+                                  publish_in, publish_out, confirm, deliver.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[rabbitmq.messages_count, rabbitmq.messages_rate, rabbitmq.objects_count, rabbitmq.queue_churn_rate, rabbitmq.node_erlang_run_queue_processes_count, rabbitmq.vhost_messages_count] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the RabbitMQ service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="rabbitmq.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="rabbitmq.messages_count"
 ```
 
 ## When to escalate out of this skill

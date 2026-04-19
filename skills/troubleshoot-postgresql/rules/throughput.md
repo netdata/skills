@@ -74,17 +74,38 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Throughput
+
+These are the real Netdata chart contexts the native collector emits for PostgreSQL. Use these names
+verbatim in `query_metrics` calls.
+
+- `postgres.queries_duration`: Observed active queries time (queries/s).
+- `postgres.checkpoints_rate`: Checkpoints (checkpoints/s). Dimensions: scheduled, requested.
+- `postgres.bgwriter_halts_rate`: Background writer scan halts (events/s). Dimensions: maxwritten.
+- `postgres.buffers_io_rate`: Buffers written rate (B/s). Dimensions: checkpoint, backend, bgwriter.
+- `postgres.buffers_backend_fsync_rate`: Backend fsync calls (calls/s). Dimensions: fsync.
+- `postgres.buffers_allocated_rate`: Buffers allocated (B/s). Dimensions: allocated.
+- `postgres.wal_io_rate`: Write-Ahead Log writes (B/s). Dimensions: write.
+- `postgres.db_transactions_rate`: Database transactions (transactions/s). Dimensions: committed,
+                                   rollback.
+- `postgres.db_io_rate`: Database reads (B/s). Dimensions: memory, disk.
+- `postgres.db_ops_fetched_rows_ratio`: Database rows fetched ratio (percentage). Dimensions:
+                                        fetched.
+- `postgres.db_ops_read_rows_rate`: Database rows read (rows/s). Dimensions: returned, fetched.
+- `postgres.db_ops_write_rows_rate`: Database rows written (rows/s). Dimensions: inserted, deleted,
+                                     updated.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[postgres.queries_duration, postgres.checkpoints_rate, postgres.bgwriter_halts_rate, postgres.buffers_io_rate, postgres.buffers_backend_fsync_rate, postgres.buffers_allocated_rate] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the PostgreSQL service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="postgres.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="postgres.queries_duration"
 ```
 
 ## When to escalate out of this skill

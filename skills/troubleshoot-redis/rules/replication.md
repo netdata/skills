@@ -89,17 +89,29 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Replication
+
+These are the real Netdata chart contexts the native collector emits for Redis. Use these names
+verbatim in `query_metrics` calls.
+
+- `redis.connected_replicas`: Connected replicas (replicas). Dimensions: connected.
+- `redis.master_link_status`: Master link status (status). Dimensions: up, down.
+- `redis.master_last_io_since_time`: Time elapsed since the last interaction with master (seconds).
+                                     Dimensions: time.
+- `redis.master_link_down_since_time`: Time elapsed since the link between master and slave is down
+                                       (seconds). Dimensions: time.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[redis.connected_replicas, redis.master_link_status, redis.master_last_io_since_time, redis.master_link_down_since_time] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Redis service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="redis.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="redis.connected_replicas"
 ```
 
 ## When to escalate out of this skill

@@ -38,6 +38,9 @@ tags:
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your Ceph instrumentation adds. Both paths end at the same MCP
   query surface.
+- Netdata's ceph collector emits 27 context(s) under `ceph.*`. The rule files enumerate which
+  contexts surface which domain; the Verification section below names the load-bearing ones
+  explicitly.
 
 ## Step-by-step
 
@@ -67,15 +70,15 @@ tags:
 
 ```text
 # Discover metrics from Ceph
-list_metrics with optional filter by context prefix
+list_metrics with q="ceph"
 
-# Pull a specific signal over the last window
-query_metrics with context=<signal>, relative_window=-15m
+# Pull a specific context over the last window
+query_metrics with context="ceph.cluster_status", relative_window=-15m
 
 # Rank anomalies for the service or host
-find_anomalous_metrics with host=<host> or service=<service>
+find_anomalous_metrics with node=<host> and context_pattern="ceph.*"
 
-# Correlate a known problem signal with others
+# Correlate a known problem context with others
 find_correlated_metrics around the incident window
 
 # Show current alert state
@@ -99,20 +102,30 @@ list_raised_alerts scoped to the node
 
 ## Verification
 
-Run these MCP queries against the Netdata instance that sees the Ceph service:
+Run these MCP queries against the Netdata instance that sees the Ceph service. Every context listed
+below is a real Netdata chart name; the agent does not need to guess.
 
 ```text
-1. list_metrics filtered by the Ceph service's context prefix.
-2. query_metrics for the key signals from the first-triggered domain over the last 30 minutes.
-3. find_anomalous_metrics scoped to the same service/time window.
+1. list_metrics filtered by q="ceph" (returns every ceph.* context Netdata sees)
+2. query_metrics with contexts=[ceph.cluster_status, ceph.cluster_osds_by_status_count, ceph.cluster_iscsi_gateways_by_status_count, ceph.cluster_objects_by_status_distribution, ceph.cluster_pgs_count, ceph.cluster_pgs_by_status_count] and relative_window=-30m
+3. find_anomalous_metrics filtered by node=<host> and context_pattern="ceph.*"
 ```
 
-Signals the playbook considers load-bearing:
+Load-bearing contexts for this service:
 
-  - the specific signals listed in the domain rule files
+- `ceph.cluster_status`: Ceph Cluster Status (status). Dimensions: ok, err, warn.
+- `ceph.cluster_osds_by_status_count`: Ceph Cluster OSDs by Status (status). Dimensions: up, down,
+                                       in, out.
+- `ceph.cluster_iscsi_gateways_by_status_count`: Ceph Cluster iSCSI Gateways by Status (gateways).
+                                                 Dimensions: up, down.
+- `ceph.cluster_objects_by_status_distribution`: Ceph Cluster Objects by Status (percent).
+                                                 Dimensions: healthy, misplaced, degraded, unfound.
+- `ceph.cluster_pgs_count`: Ceph Cluster Placement Groups (pgs). Dimensions: pgs.
+- `ceph.cluster_pgs_by_status_count`: Ceph Cluster Placement Groups by Status (pgs). Dimensions:
+                                      clean, working, warning, unknown.
 
-A clean result means every key signal is within its expected band and the `find_anomalous_metrics`
-list is empty or contains only already-acknowledged items. If the fix was real, re-running the same
+A clean result means every context is within its expected band and the `find_anomalous_metrics` list
+is empty or contains only already-acknowledged items. If the fix was real, re-running the same
 queries 10 minutes after applying it will show a clean result. If it does not, revert and look
 deeper.
 

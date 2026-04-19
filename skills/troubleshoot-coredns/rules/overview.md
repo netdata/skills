@@ -46,17 +46,45 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Overview
+
+These are the real Netdata chart contexts the native collector emits for CoreDNS. Use these names
+verbatim in `query_metrics` calls.
+
+- `coredns.dns_request_count_total`: Number Of DNS Requests (requests/s). Dimensions: requests.
+- `coredns.dns_responses_count_total`: Number Of DNS Responses (responses/s). Dimensions: responses.
+- `coredns.dns_request_count_total_per_status`: Number Of Processed And Dropped DNS Requests
+                                                (requests/s). Dimensions: processed, dropped.
+- `coredns.dns_no_matching_zone_dropped_total`: Number Of Dropped DNS Requests Because Of No
+                                                Matching Zone (requests/s). Dimensions: dropped.
+- `coredns.dns_panic_count_total`: Number Of Panics (panics/s). Dimensions: panics.
+- `coredns.dns_requests_count_total_per_proto`: Number Of DNS Requests Per Transport Protocol
+                                                (requests/s). Dimensions: udp, tcp.
+- `coredns.dns_requests_count_total_per_ip_family`: Number Of DNS Requests Per IP Family
+                                                    (requests/s). Dimensions: v4, v6.
+- `coredns.dns_requests_count_total_per_per_type`: Number Of DNS Requests Per Type (requests/s).
+                                                   Dimensions: a, aaaa, mx, soa, cname, ptr.
+- `coredns.dns_responses_count_total_per_rcode`: Number Of DNS Responses Per Rcode (responses/s).
+                                                 Dimensions: noerror, formerr, servfail, nxdomain,
+                                                 notimp, refused.
+- `coredns.server_dns_request_count_total`: Number Of DNS Requests (requests/s). Dimensions:
+                                            requests.
+- `coredns.server_dns_responses_count_total`: Number Of DNS Responses (responses/s). Dimensions:
+                                              responses.
+- `coredns.server_request_count_total_per_status`: Number Of Processed And Dropped DNS Requests
+                                                   (requests/s). Dimensions: processed, dropped.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[coredns.dns_request_count_total, coredns.dns_responses_count_total, coredns.dns_request_count_total_per_status, coredns.dns_no_matching_zone_dropped_total, coredns.dns_panic_count_total, coredns.dns_requests_count_total_per_proto] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the CoreDNS service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="coredns.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="coredns.dns_request_count_total"
 ```
 
 ## When to escalate out of this skill

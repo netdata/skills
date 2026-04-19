@@ -77,17 +77,42 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Availability
+
+These are the real Netdata chart contexts the native collector emits for MySQL. Use these names
+verbatim in `query_metrics` calls.
+
+- `mysql.queries_type`: Queries By Type (queries/s). Dimensions: select, delete, update, insert,
+                        replace.
+- `mysql.handlers`: Handlers (handlers/s). Dimensions: commit, delete, prepare, read_first,
+                    read_key, read_next.
+- `mysql.connections`: Connections (connections/s). Dimensions: all, aborted.
+- `mysql.connections_active`: Active Connections (connections). Dimensions: active, limit,
+                              max_active.
+- `mysql.threads`: Threads (threads). Dimensions: connected, cached, running.
+- `mysql.innodb_redo_log_occupancy`: InnoDB Redo Log Occupancy (percentage). Dimensions: occupancy.
+- `mysql.innodb_rows`: InnoDB Row Operations (operations/s). Dimensions: inserted, read, updated,
+                       deleted.
+- `mysql.connection_errors`: Connection Errors (errors/s). Dimensions: accept, internal, max,
+                             peer_addr, select, tcpwrap.
+- `mysql.galera_cluster_status`: Cluster Component Status (status). Dimensions: primary,
+                                 non_primary, disconnected.
+- `mysql.galera_connected`: Cluster Connection Status (boolean). Dimensions: connected.
+- `mysql.galera_ready`: Accept Queries Readiness Status (boolean). Dimensions: ready.
+- `mysql.slave_status`: I/O / SQL Thread Running State (boolean). Dimensions: sql_running,
+                        io_running.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[mysql.queries_type, mysql.handlers, mysql.connections, mysql.connections_active, mysql.threads, mysql.innodb_redo_log_occupancy] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the MySQL service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="mysql.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="mysql.queries_type"
 ```
 
 ## When to escalate out of this skill

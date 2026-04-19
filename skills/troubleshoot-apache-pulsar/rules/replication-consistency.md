@@ -69,17 +69,37 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Replication & Consistency
+
+These are the real Netdata chart contexts the native collector emits for Apache Pulsar. Use these
+names verbatim in `query_metrics` calls.
+
+- `pulsar.replication_rate`: Replication Rate (messages/s). Dimensions: in, out.
+- `pulsar.replication_throughput_rate`: Replication Throughput Rate (KiB/s). Dimensions: in, out.
+- `pulsar.replication_backlog`: Replication Backlog (messages). Dimensions: backlog.
+- `pulsar.namespace_replication_rate`: Replication Rate (messages/s). Dimensions: in, out.
+- `pulsar.namespace_replication_throughput_rate`: Replication Throughput Rate (KiB/s). Dimensions:
+                                                  in, out.
+- `pulsar.namespace_replication_backlog`: Replication Backlog (messages). Dimensions: backlog.
+- `pulsar.topic_replication_rate_in`: Topic Replication Rate From Remote Cluster (messages/s).
+- `pulsar.topic_replication_rate_out`: Topic Replication Rate To Remote Cluster (messages/s).
+- `pulsar.topic_replication_throughput_rate_in`: Topic Replication Throughput Rate From Remote
+                                                 Cluster (messages/s).
+- `pulsar.topic_replication_throughput_rate_out`: Topic Replication Throughput Rate To Remote
+                                                  Cluster (messages/s).
+- `pulsar.topic_replication_backlog`: Topic Replication Backlog (messages).
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[pulsar.replication_rate, pulsar.replication_throughput_rate, pulsar.replication_backlog, pulsar.namespace_replication_rate, pulsar.namespace_replication_throughput_rate, pulsar.namespace_replication_backlog] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Apache Pulsar service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="pulsar.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="pulsar.replication_rate"
 ```
 
 ## When to escalate out of this skill

@@ -64,17 +64,29 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Throughput
+
+These are the real Netdata chart contexts the native collector emits for Apache HTTPD. Use these
+names verbatim in `query_metrics` calls.
+
+- `apache.requests`: Requests (requests/s). Dimensions: requests.
+- `apache.reqpersec`: Lifetime Average Number Of Requests Per Second (requests/s). Dimensions:
+                      requests.
+- `apache.requests`: Requests (requests/s). Dimensions: requests.
+- `apache.reqpersec`: Lifetime Average Number Of Requests Per Second (requests/s). Dimensions:
+                      requests.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[apache.requests, apache.reqpersec, apache.requests, apache.reqpersec] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Apache HTTPD service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="apache.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="apache.requests"
 ```
 
 ## When to escalate out of this skill

@@ -44,6 +44,9 @@ tags:
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your Redis instrumentation adds. Both paths end at the same MCP
   query surface.
+- Netdata's redis collector emits 25 context(s) under `redis.*`. The rule files enumerate which
+  contexts surface which domain; the Verification section below names the load-bearing ones
+  explicitly.
 
 ## Step-by-step
 
@@ -76,15 +79,15 @@ tags:
 
 ```text
 # Discover metrics from Redis
-list_metrics with optional filter by context prefix
+list_metrics with q="redis"
 
-# Pull a specific signal over the last window
-query_metrics with context=<signal>, relative_window=-15m
+# Pull a specific context over the last window
+query_metrics with context="redis.connections", relative_window=-15m
 
 # Rank anomalies for the service or host
-find_anomalous_metrics with host=<host> or service=<service>
+find_anomalous_metrics with node=<host> and context_pattern="redis.*"
 
-# Correlate a known problem signal with others
+# Correlate a known problem context with others
 find_correlated_metrics around the incident window
 
 # Show current alert state
@@ -108,25 +111,28 @@ list_raised_alerts scoped to the node
 
 ## Verification
 
-Run these MCP queries against the Netdata instance that sees the Redis service:
+Run these MCP queries against the Netdata instance that sees the Redis service. Every context listed
+below is a real Netdata chart name; the agent does not need to guess.
 
 ```text
-1. list_metrics filtered by the Redis service's context prefix.
-2. query_metrics for the key signals from the first-triggered domain over the last 30 minutes.
-3. find_anomalous_metrics scoped to the same service/time window.
+1. list_metrics filtered by q="redis" (returns every redis.* context Netdata sees)
+2. query_metrics with contexts=[redis.connections, redis.clients, redis.ping_latency, redis.keyspace_lookup_hit_rate, redis.bgsave_health, redis.connected_replicas] and relative_window=-30m
+3. find_anomalous_metrics filtered by node=<host> and context_pattern="redis.*"
 ```
 
-Signals the playbook considers load-bearing:
+Load-bearing contexts for this service:
 
-  - Redis Reachability
-  - Uptime and Unexpected Restarts
-  - Loading State
-  - Memory Usage Ratio
-  - Memory Fragmentation Ratio
-  - Evicted Keys Rate
+- `redis.connections`: Accepted and rejected (maxclients limit) connections (connections/s).
+                       Dimensions: accepted, rejected.
+- `redis.clients`: Clients (clients). Dimensions: connected, blocked, tracking, in_timeout_table.
+- `redis.ping_latency`: Ping latency (seconds). Dimensions: min, max, avg.
+- `redis.keyspace_lookup_hit_rate`: Keys lookup hit rate (percentage). Dimensions: lookup_hit_rate.
+- `redis.bgsave_health`: Status of the last RDB save operation (0: ok, 1: err) (status). Dimensions:
+                         last_bgsave.
+- `redis.connected_replicas`: Connected replicas (replicas). Dimensions: connected.
 
-A clean result means every key signal is within its expected band and the `find_anomalous_metrics`
-list is empty or contains only already-acknowledged items. If the fix was real, re-running the same
+A clean result means every context is within its expected band and the `find_anomalous_metrics` list
+is empty or contains only already-acknowledged items. If the fix was real, re-running the same
 queries 10 minutes after applying it will show a clean result. If it does not, revert and look
 deeper.
 

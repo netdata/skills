@@ -76,17 +76,31 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Network
+
+These are the real Netdata chart contexts the native collector emits for VMware vSphere. Use these
+names verbatim in `query_metrics` calls.
+
+- `vsphere.vm_net_traffic`: Virtual Machine network traffic (KiB/s). Dimensions: received, sent.
+- `vsphere.vm_net_packets`: Virtual Machine network packets (packets). Dimensions: received, sent.
+- `vsphere.vm_net_drops`: Virtual Machine network dropped packets (packets). Dimensions: received,
+                          sent.
+- `vsphere.host_net_traffic`: ESXi Host network traffic (KiB/s). Dimensions: received, sent.
+- `vsphere.host_net_packets`: ESXi Host network packets (packets). Dimensions: received, sent.
+- `vsphere.host_net_drops`: ESXi Host network drops (packets). Dimensions: received, sent.
+- `vsphere.host_net_errors`: ESXi Host network errors (errors). Dimensions: received, sent.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[vsphere.vm_net_traffic, vsphere.vm_net_packets, vsphere.vm_net_drops, vsphere.host_net_traffic, vsphere.host_net_packets, vsphere.host_net_drops] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the VMware vSphere service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="vsphere.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="vsphere.vm_net_traffic"
 ```
 
 ## When to escalate out of this skill

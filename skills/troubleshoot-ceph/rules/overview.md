@@ -46,17 +46,40 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Overview
+
+These are the real Netdata chart contexts the native collector emits for Ceph. Use these names
+verbatim in `query_metrics` calls.
+
+- `ceph.cluster_status`: Ceph Cluster Status (status). Dimensions: ok, err, warn.
+- `ceph.cluster_hosts_count`: Ceph Cluster Hosts (hosts). Dimensions: hosts.
+- `ceph.cluster_monitors_count`: Ceph Cluster Monitors (monitors). Dimensions: monitors.
+- `ceph.cluster_osds_count`: Ceph Cluster OSDs (osds). Dimensions: osds.
+- `ceph.cluster_osds_by_status_count`: Ceph Cluster OSDs by Status (status). Dimensions: up, down,
+                                       in, out.
+- `ceph.cluster_managers_count`: Ceph Cluster Managers (managers). Dimensions: active, standby.
+- `ceph.cluster_object_gateways_count`: Ceph Cluster Object Gateways (RGW) (gateways). Dimensions:
+                                        object.
+- `ceph.cluster_iscsi_gateways_count`: Ceph Cluster iSCSI Gateways (gateways). Dimensions: iscsi.
+- `ceph.cluster_iscsi_gateways_by_status_count`: Ceph Cluster iSCSI Gateways by Status (gateways).
+                                                 Dimensions: up, down.
+- `ceph.cluster_physical_capacity_utilization`: Ceph Cluster Physical Capacity Utilization
+                                                (percent). Dimensions: utilization.
+- `ceph.cluster_physical_capacity_usage`: Ceph Cluster Physical Capacity Usage (bytes). Dimensions:
+                                          avail, used.
+- `ceph.cluster_objects_count`: Ceph Cluster Objects (objects). Dimensions: objects.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[ceph.cluster_status, ceph.cluster_hosts_count, ceph.cluster_monitors_count, ceph.cluster_osds_count, ceph.cluster_osds_by_status_count, ceph.cluster_managers_count] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Ceph service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="ceph.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="ceph.cluster_status"
 ```
 
 ## When to escalate out of this skill

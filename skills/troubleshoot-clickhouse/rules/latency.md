@@ -63,17 +63,37 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Latency
+
+These are the real Netdata chart contexts the native collector emits for ClickHouse. Use these names
+verbatim in `query_metrics` calls.
+
+- `clickhouse.slow_reads`: Slow reads from a file (reads/s). Dimensions: slow.
+- `clickhouse.queries_preempted`: Queries waiting due to priority (queries). Dimensions: preempted.
+- `clickhouse.longest_running_query_time`: Longest running query time (seconds). Dimensions:
+                                           longest_query_time.
+- `clickhouse.queries_latency`: Queries latency (microseconds). Dimensions: queries_time.
+- `clickhouse.select_queries_latency`: Select queries latency (microseconds). Dimensions:
+                                       selects_time.
+- `clickhouse.insert_queries_latency`: Insert queries latency (microseconds). Dimensions:
+                                       inserts_time.
+- `clickhouse.delayed_inserts_throttle_time`: Delayed inserts throttle time (milliseconds).
+                                              Dimensions: delayed_inserts_throttle_time.
+- `clickhouse.merges_latency`: Time spent for background merges (milliseconds). Dimensions:
+                               merges_time.
+- `clickhouse.uptime`: Uptime (seconds). Dimensions: uptime.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[clickhouse.slow_reads, clickhouse.queries_preempted, clickhouse.longest_running_query_time, clickhouse.queries_latency, clickhouse.select_queries_latency, clickhouse.insert_queries_latency] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the ClickHouse service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="clickhouse.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="clickhouse.slow_reads"
 ```
 
 ## When to escalate out of this skill

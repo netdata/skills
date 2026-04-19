@@ -52,6 +52,9 @@ tags:
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your PgBouncer instrumentation adds. Both paths end at the same
   MCP query surface.
+- Netdata's pgbouncer collector emits 13 context(s) under `pgbouncer.*`. The rule files enumerate
+  which contexts surface which domain; the Verification section below names the load-bearing ones
+  explicitly.
 
 ## Step-by-step
 
@@ -88,15 +91,15 @@ tags:
 
 ```text
 # Discover metrics from PgBouncer
-list_metrics with optional filter by context prefix
+list_metrics with q="pgbouncer"
 
-# Pull a specific signal over the last window
-query_metrics with context=<signal>, relative_window=-15m
+# Pull a specific context over the last window
+query_metrics with context="pgbouncer.client_connections_utilization", relative_window=-15m
 
 # Rank anomalies for the service or host
-find_anomalous_metrics with host=<host> or service=<service>
+find_anomalous_metrics with node=<host> and context_pattern="pgbouncer.*"
 
-# Correlate a known problem signal with others
+# Correlate a known problem context with others
 find_correlated_metrics around the incident window
 
 # Show current alert state
@@ -120,20 +123,30 @@ list_raised_alerts scoped to the node
 
 ## Verification
 
-Run these MCP queries against the Netdata instance that sees the PgBouncer service:
+Run these MCP queries against the Netdata instance that sees the PgBouncer service. Every context
+listed below is a real Netdata chart name; the agent does not need to guess.
 
 ```text
-1. list_metrics filtered by the PgBouncer service's context prefix.
-2. query_metrics for the key signals from the first-triggered domain over the last 30 minutes.
-3. find_anomalous_metrics scoped to the same service/time window.
+1. list_metrics filtered by q="pgbouncer" (returns every pgbouncer.* context Netdata sees)
+2. query_metrics with contexts=[pgbouncer.client_connections_utilization, pgbouncer.db_client_connections, pgbouncer.db_server_connections, pgbouncer.db_server_connections_utilization, pgbouncer.db_queries, pgbouncer.db_queries_time] and relative_window=-30m
+3. find_anomalous_metrics filtered by node=<host> and context_pattern="pgbouncer.*"
 ```
 
-Signals the playbook considers load-bearing:
+Load-bearing contexts for this service:
 
-  - the specific signals listed in the domain rule files
+- `pgbouncer.client_connections_utilization`: Client connections utilization (percentage).
+                                              Dimensions: used.
+- `pgbouncer.db_client_connections`: Database client connections (connections). Dimensions: active,
+                                     waiting, cancel_req.
+- `pgbouncer.db_server_connections`: Database server connections (connections). Dimensions: active,
+                                     idle, used, tested, login.
+- `pgbouncer.db_server_connections_utilization`: Database server connections utilization
+                                                 (percentage). Dimensions: used.
+- `pgbouncer.db_queries`: Database pooled SQL queries (queries/s). Dimensions: queries.
+- `pgbouncer.db_queries_time`: Database queries time (seconds). Dimensions: time.
 
-A clean result means every key signal is within its expected band and the `find_anomalous_metrics`
-list is empty or contains only already-acknowledged items. If the fix was real, re-running the same
+A clean result means every context is within its expected band and the `find_anomalous_metrics` list
+is empty or contains only already-acknowledged items. If the fix was real, re-running the same
 queries 10 minutes after applying it will show a clean result. If it does not, revert and look
 deeper.
 

@@ -46,17 +46,42 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Overview
+
+These are the real Netdata chart contexts the native collector emits for Cockroachdb. Use these
+names verbatim in `query_metrics` calls.
+
+- `cockroachdb.process_cpu_time_combined_percentage`: Combined CPU Time Percentage, Normalized 0-1
+                                                      by Number of Cores (percentage). Dimensions:
+                                                      used.
+- `cockroachdb.process_cpu_time_percentage`: CPU Time Percentage (percentage). Dimensions: user,
+                                             sys.
+- `cockroachdb.process_cpu_time`: CPU Time (ms). Dimensions: user, sys.
+- `cockroachdb.process_memory`: Memory Usage (KiB). Dimensions: rss.
+- `cockroachdb.process_file_descriptors`: File Descriptors (fd). Dimensions: open.
+- `cockroachdb.process_uptime`: Uptime (seconds). Dimensions: uptime.
+- `cockroachdb.host_disk_bandwidth`: Host Disk Cumulative Bandwidth (KiB). Dimensions: read, write.
+- `cockroachdb.host_disk_operations`: Host Disk Cumulative Operations (operations). Dimensions:
+                                      reads, writes.
+- `cockroachdb.host_disk_iops_in_progress`: Host Disk Cumulative IOPS In Progress (iops).
+                                            Dimensions: in_progress.
+- `cockroachdb.host_network_bandwidth`: Host Network Cumulative Bandwidth (kilobits). Dimensions:
+                                        received, sent.
+- `cockroachdb.host_network_packets`: Host Network Cumulative Packets (packets). Dimensions:
+                                      received, sent.
+- `cockroachdb.live_nodes`: Live Nodes in the Cluster (nodes). Dimensions: live_nodes.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[cockroachdb.process_cpu_time_combined_percentage, cockroachdb.process_cpu_time_percentage, cockroachdb.process_cpu_time, cockroachdb.process_memory, cockroachdb.process_file_descriptors, cockroachdb.process_uptime] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Cockroachdb service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="cockroachdb.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="cockroachdb.process_cpu_time_combined_percentage"
 ```
 
 ## When to escalate out of this skill

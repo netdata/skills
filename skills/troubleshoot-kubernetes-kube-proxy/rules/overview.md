@@ -47,17 +47,35 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Overview
+
+These are the real Netdata chart contexts the native collector emits for Kubernetes Kube Proxy. Use
+these names verbatim in `query_metrics` calls.
+
+- `k8s_kubeproxy.kubeproxy_sync_proxy_rules`: Sync Proxy Rules (events/s). Dimensions:
+                                              sync_proxy_rules.
+- `k8s_kubeproxy.kubeproxy_sync_proxy_rules_latency_microsecond`: Sync Proxy Rules Latency
+                                                                  (observes/s). Dimensions: 0.001,
+                                                                  0.002, 0.004, 0.008, 0.016, 0.032.
+- `k8s_kubeproxy.kubeproxy_sync_proxy_rules_latency`: Sync Proxy Rules Latency Percentage
+                                                      (percentage). Dimensions: 0.001, 0.002, 0.004,
+                                                      0.008, 0.016, 0.032.
+- `k8s_kubeproxy.rest_client_requests_by_code`: HTTP Requests By Status Code (requests/s).
+- `k8s_kubeproxy.rest_client_requests_by_method`: HTTP Requests By Status Method (requests/s).
+- `k8s_kubeproxy.http_request_duration`: HTTP Requests Duration (microseconds). Dimensions: 0.5,
+                                         0.9, 0.99.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[k8s_kubeproxy.kubeproxy_sync_proxy_rules, k8s_kubeproxy.kubeproxy_sync_proxy_rules_latency_microsecond, k8s_kubeproxy.kubeproxy_sync_proxy_rules_latency, k8s_kubeproxy.rest_client_requests_by_code, k8s_kubeproxy.rest_client_requests_by_method, k8s_kubeproxy.http_request_duration] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Kubernetes Kube Proxy service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="k8s_kubeproxy.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="k8s_kubeproxy.kubeproxy_sync_proxy_rules"
 ```
 
 ## When to escalate out of this skill

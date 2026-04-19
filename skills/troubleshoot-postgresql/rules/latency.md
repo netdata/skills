@@ -77,17 +77,40 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Latency
+
+These are the real Netdata chart contexts the native collector emits for PostgreSQL. Use these names
+verbatim in `query_metrics` calls.
+
+- `postgres.transactions_duration`: Observed transactions time (transactions/s).
+- `postgres.queries_duration`: Observed active queries time (queries/s).
+- `postgres.checkpoints_time`: Checkpoint time (milliseconds). Dimensions: write, sync.
+- `postgres.uptime`: Uptime (seconds). Dimensions: uptime.
+- `postgres.replication_app_wal_lag_time`: Standby application WAL lag time (seconds). Dimensions:
+                                           write_lag, flush_lag, replay_lag.
+- `postgres.db_locks_awaited_count`: Database locks awaited (locks). Dimensions: access_share,
+                                     row_share, row_exclusive, share_update, share,
+                                     share_row_exclusive.
+- `postgres.table_autovacuum_since_time`: Table time since last auto VACUUM (seconds). Dimensions:
+                                          time.
+- `postgres.table_vacuum_since_time`: Table time since last manual VACUUM (seconds). Dimensions:
+                                      time.
+- `postgres.table_autoanalyze_since_time`: Table time since last auto ANALYZE (seconds). Dimensions:
+                                           time.
+- `postgres.table_analyze_since_time`: Table time since last manual ANALYZE (seconds). Dimensions:
+                                       time.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[postgres.transactions_duration, postgres.queries_duration, postgres.checkpoints_time, postgres.uptime, postgres.replication_app_wal_lag_time, postgres.db_locks_awaited_count] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the PostgreSQL service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="postgres.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="postgres.transactions_duration"
 ```
 
 ## When to escalate out of this skill

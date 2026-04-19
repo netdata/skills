@@ -46,17 +46,29 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Overview
+
+These are the real Netdata chart contexts the native collector emits for Traefik. Use these names
+verbatim in `query_metrics` calls.
+
+- `traefik.entrypoint_requests`: Processed HTTP requests (requests/s). Dimensions: 1xx, 2xx, 3xx,
+                                 4xx, 5xx.
+- `traefik.entrypoint_request_duration_average`: Average HTTP request processing time
+                                                 (milliseconds). Dimensions: 1xx, 2xx, 3xx, 4xx,
+                                                 5xx.
+- `traefik.entrypoint_open_connections`: Open connections (connections).
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[traefik.entrypoint_requests, traefik.entrypoint_request_duration_average, traefik.entrypoint_open_connections] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Traefik service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="traefik.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="traefik.entrypoint_requests"
 ```
 
 ## When to escalate out of this skill

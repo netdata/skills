@@ -35,6 +35,9 @@ tags:
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your Docker Engine instrumentation adds. Both paths end at the
   same MCP query surface.
+- Netdata's docker_engine collector emits 8 context(s) under `docker_engine.*`. The rule files
+  enumerate which contexts surface which domain; the Verification section below names the
+  load-bearing ones explicitly.
 
 ## Step-by-step
 
@@ -54,15 +57,15 @@ tags:
 
 ```text
 # Discover metrics from Docker Engine
-list_metrics with optional filter by context prefix
+list_metrics with q="docker_engine"
 
-# Pull a specific signal over the last window
-query_metrics with context=<signal>, relative_window=-15m
+# Pull a specific context over the last window
+query_metrics with context="docker_engine.builder_builds_failed_total", relative_window=-15m
 
 # Rank anomalies for the service or host
-find_anomalous_metrics with host=<host> or service=<service>
+find_anomalous_metrics with node=<host> and context_pattern="docker_engine.*"
 
-# Correlate a known problem signal with others
+# Correlate a known problem context with others
 find_correlated_metrics around the incident window
 
 # Show current alert state
@@ -86,20 +89,37 @@ list_raised_alerts scoped to the node
 
 ## Verification
 
-Run these MCP queries against the Netdata instance that sees the Docker Engine service:
+Run these MCP queries against the Netdata instance that sees the Docker Engine service. Every
+context listed below is a real Netdata chart name; the agent does not need to guess.
 
 ```text
-1. list_metrics filtered by the Docker Engine service's context prefix.
-2. query_metrics for the key signals from the first-triggered domain over the last 30 minutes.
-3. find_anomalous_metrics scoped to the same service/time window.
+1. list_metrics filtered by q="docker_engine" (returns every docker_engine.* context Netdata sees)
+2. query_metrics with contexts=[docker_engine.builder_builds_failed_total, docker_engine.engine_daemon_health_checks_failed_total, docker_engine.swarm_manager_nodes_per_state, docker_engine.swarm_manager_tasks_per_state, docker_engine.engine_daemon_container_actions, docker_engine.engine_daemon_container_states_containers] and relative_window=-30m
+3. find_anomalous_metrics filtered by node=<host> and context_pattern="docker_engine.*"
 ```
 
-Signals the playbook considers load-bearing:
+Load-bearing contexts for this service:
 
-  - the specific signals listed in the domain rule files
+- `docker_engine.builder_builds_failed_total`: Builder Builds Fails By Reason (fails/s). Dimensions:
+                                               build_canceled, build_target_not_reachable_error,
+                                               command_not_supported_error, dockerfile_empty_error,
+                                               dockerfile_syntax_error,
+                                               error_processing_commands_error.
+- `docker_engine.engine_daemon_health_checks_failed_total`: Health Checks (events/s). Dimensions:
+                                                            fails.
+- `docker_engine.swarm_manager_nodes_per_state`: Swarm Manager Nodes Per State (nodes). Dimensions:
+                                                 ready, down, unknown, disconnected.
+- `docker_engine.swarm_manager_tasks_per_state`: Swarm Manager Tasks Per State (tasks). Dimensions:
+                                                 running, failed, ready, rejected, starting,
+                                                 shutdown.
+- `docker_engine.engine_daemon_container_actions`: Container Actions (actions/s). Dimensions:
+                                                   changes, commit, create, delete, start.
+- `docker_engine.engine_daemon_container_states_containers`: Containers In Various States
+                                                             (containers). Dimensions: running,
+                                                             paused, stopped.
 
-A clean result means every key signal is within its expected band and the `find_anomalous_metrics`
-list is empty or contains only already-acknowledged items. If the fix was real, re-running the same
+A clean result means every context is within its expected band and the `find_anomalous_metrics` list
+is empty or contains only already-acknowledged items. If the fix was real, re-running the same
 queries 10 minutes after applying it will show a clean result. If it does not, revert and look
 deeper.
 

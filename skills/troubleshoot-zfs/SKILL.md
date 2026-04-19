@@ -51,6 +51,9 @@ tags:
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your Zfs instrumentation adds. Both paths end at the same MCP
   query surface.
+- Netdata's zfspool collector emits 5 context(s) under `zfspool.*`. The rule files enumerate which
+  contexts surface which domain; the Verification section below names the load-bearing ones
+  explicitly.
 
 ## Step-by-step
 
@@ -88,15 +91,15 @@ tags:
 
 ```text
 # Discover metrics from Zfs
-list_metrics with optional filter by context prefix
+list_metrics with q="zfspool"
 
-# Pull a specific signal over the last window
-query_metrics with context=<signal>, relative_window=-15m
+# Pull a specific context over the last window
+query_metrics with context="zfspool.pool_health_state", relative_window=-15m
 
 # Rank anomalies for the service or host
-find_anomalous_metrics with host=<host> or service=<service>
+find_anomalous_metrics with node=<host> and context_pattern="zfspool.*"
 
-# Correlate a known problem signal with others
+# Correlate a known problem context with others
 find_correlated_metrics around the incident window
 
 # Show current alert state
@@ -120,23 +123,27 @@ list_raised_alerts scoped to the node
 
 ## Verification
 
-Run these MCP queries against the Netdata instance that sees the Zfs service:
+Run these MCP queries against the Netdata instance that sees the Zfs service. Every context listed
+below is a real Netdata chart name; the agent does not need to guess.
 
 ```text
-1. list_metrics filtered by the Zfs service's context prefix.
-2. query_metrics for the key signals from the first-triggered domain over the last 30 minutes.
-3. find_anomalous_metrics scoped to the same service/time window.
+1. list_metrics filtered by q="zfspool" (returns every zfspool.* context Netdata sees)
+2. query_metrics with contexts=[zfspool.pool_health_state, zfspool.vdev_health_state, zfspool.pool_space_utilization, zfspool.pool_space_usage, zfspool.pool_fragmentation] and relative_window=-30m
+3. find_anomalous_metrics filtered by node=<host> and context_pattern="zfspool.*"
 ```
 
-Signals the playbook considers load-bearing:
+Load-bearing contexts for this service:
 
-  - Pool Health State
-  - Per-Vdev State and Error Counts (Data-Bearing Vdevs)
-  - Scrub Status, Completion, and Permanent Errors
-  - Pool I/O Operations and Bandwidth
+- `zfspool.pool_health_state`: Zpool health state (state). Dimensions: online, degraded, faulted,
+                               offline, unavail, removed.
+- `zfspool.vdev_health_state`: Zpool Vdev health state (state). Dimensions: online, degraded,
+                               faulted, offline, unavail, removed.
+- `zfspool.pool_space_utilization`: Zpool space utilization (%). Dimensions: utilization.
+- `zfspool.pool_space_usage`: Zpool space usage (bytes). Dimensions: free, used.
+- `zfspool.pool_fragmentation`: Zpool fragmentation (%). Dimensions: fragmentation.
 
-A clean result means every key signal is within its expected band and the `find_anomalous_metrics`
-list is empty or contains only already-acknowledged items. If the fix was real, re-running the same
+A clean result means every context is within its expected band and the `find_anomalous_metrics` list
+is empty or contains only already-acknowledged items. If the fix was real, re-running the same
 queries 10 minutes after applying it will show a clean result. If it does not, revert and look
 deeper.
 

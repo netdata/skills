@@ -46,17 +46,35 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Overview
+
+These are the real Netdata chart contexts the native collector emits for Logstash. Use these names
+verbatim in `query_metrics` calls.
+
+- `logstash.jvm_threads`: JVM Threads (count). Dimensions: threads.
+- `logstash.jvm_mem_heap_used`: JVM Heap Memory Percentage (percentage). Dimensions: in_use.
+- `logstash.jvm_mem_heap`: JVM Heap Memory (KiB). Dimensions: committed, used.
+- `logstash.jvm_mem_pools_eden`: JVM Pool Eden Memory (KiB). Dimensions: committed, used.
+- `logstash.jvm_mem_pools_survivor`: JVM Pool Survivor Memory (KiB). Dimensions: committed, used.
+- `logstash.jvm_mem_pools_old`: JVM Pool Old Memory (KiB). Dimensions: committed, used.
+- `logstash.jvm_gc_collector_count`: Garbage Collection Count (counts/s). Dimensions: eden, old.
+- `logstash.jvm_gc_collector_time`: Time Spent On Garbage Collection (ms). Dimensions: eden, old.
+- `logstash.open_file_descriptors`: Open File Descriptors (fd). Dimensions: open.
+- `logstash.event`: Events Overview (events/s). Dimensions: in, filtered, out.
+- `logstash.event_duration`: Events Duration (seconds). Dimensions: event, queue.
+- `logstash.uptime`: Uptime (seconds). Dimensions: uptime.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[logstash.jvm_threads, logstash.jvm_mem_heap_used, logstash.jvm_mem_heap, logstash.jvm_mem_pools_eden, logstash.jvm_mem_pools_survivor, logstash.jvm_mem_pools_old] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Logstash service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="logstash.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="logstash.jvm_threads"
 ```
 
 ## When to escalate out of this skill

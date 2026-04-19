@@ -46,17 +46,36 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Overview
+
+These are the real Netdata chart contexts the native collector emits for Oracle Database. Use these
+names verbatim in `query_metrics` calls.
+
+- `oracledb.sessions`: Sessions (sessions). Dimensions: session.
+- `oracledb.average_active_sessions`: Average Active Sessions (sessions). Dimensions: active.
+- `oracledb.sessions_utilization`: Sessions Limit % (percent). Dimensions: session_limit.
+- `oracledb.current_logons`: Current Logons (logons). Dimensions: logons.
+- `oracledb.logons`: Logons (logons/s). Dimensions: logons.
+- `oracledb.database_wait_time_ratio`: Database Wait Time Ratio (percent). Dimensions: db_wait_time.
+- `oracledb.sql_service_response_time`: SQL Service Response Time (seconds). Dimensions:
+                                        sql_resp_time.
+- `oracledb.enqueue_timeouts`: Enqueue Timeouts (timeouts/s). Dimensions: enqueue.
+- `oracledb.disk_io`: Disk IO (bytes/s). Dimensions: read, written.
+- `oracledb.disk_iops`: Disk IOPS (operations/s). Dimensions: read, write.
+- `oracledb.sorts`: Sorts (sorts/s). Dimensions: memory, disk.
+- `oracledb.table_scans`: Table Scans (scans/s). Dimensions: short_table, long_table.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[oracledb.sessions, oracledb.average_active_sessions, oracledb.sessions_utilization, oracledb.current_logons, oracledb.logons, oracledb.database_wait_time_ratio] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Oracle Database service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="oracledb.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="oracledb.sessions"
 ```
 
 ## When to escalate out of this skill

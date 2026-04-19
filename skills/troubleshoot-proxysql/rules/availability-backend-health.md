@@ -67,17 +67,43 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Availability & Backend Health
+
+These are the real Netdata chart contexts the native collector emits for Proxysql. Use these names
+verbatim in `query_metrics` calls.
+
+- `proxysql.client_connections_count`: Client connections (connections). Dimensions: connected,
+                                       non_idle, hostgroup_locked.
+- `proxysql.client_connections_rate`: Client connections rate (connections/s). Dimensions: created,
+                                      aborted.
+- `proxysql.server_connections_count`: Server connections (connections). Dimensions: connected.
+- `proxysql.server_connections_rate`: Server connections rate (connections/s). Dimensions: created,
+                                      aborted, delayed.
+- `proxysql.backends_traffic`: Backends traffic (B/s). Dimensions: recv, sent.
+- `proxysql.active_transactions_count`: Client connections that are currently processing a
+                                        transaction (connections). Dimensions: client.
+- `proxysql.queries_rate`: Queries rate (queries/s). Dimensions: autocommit, autocommit_filtered,
+                           commit_filtered, rollback, rollback_filtered, backend_change_user.
+- `proxysql.backend_statements_count`: Statements available across all backend connections
+                                       (statements). Dimensions: total, unique.
+- `proxysql.backend_statements_rate`: Statements executed against the backends (statements/s).
+                                      Dimensions: prepare, execute, close.
+- `proxysql.mysql_monitor_ping_checks_rate`: MySQL monitor ping checks (checks/s). Dimensions:
+                                             succeed, failed.
+- `proxysql.uptime`: Uptime (seconds). Dimensions: uptime.
+- `proxysql.mysql_command_execution_rate`: MySQL command execution (seconds). Dimensions: uptime.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[proxysql.client_connections_count, proxysql.client_connections_rate, proxysql.server_connections_count, proxysql.server_connections_rate, proxysql.backends_traffic, proxysql.active_transactions_count] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Proxysql service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="proxysql.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="proxysql.client_connections_count"
 ```
 
 ## When to escalate out of this skill

@@ -46,17 +46,54 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Overview
+
+These are the real Netdata chart contexts the native collector emits for Kubernetes Kubelet. Use
+these names verbatim in `query_metrics` calls.
+
+- `k8s_kubelet.apiserver_audit_requests_rejected`: API Server Audit Requests (requests/s).
+                                                   Dimensions: rejected.
+- `k8s_kubelet.apiserver_storage_data_key_generation_failures`: API Server Failed Data Encryption
+                                                                Key(DEK) Generation Operations
+                                                                (events/s). Dimensions: failures.
+- `k8s_kubelet.apiserver_storage_data_key_generation_latencies`: API Server Latencies Of Data
+                                                                 Encryption Key(DEK) Generation
+                                                                 Operations (observes/s).
+                                                                 Dimensions: 5_µs, 10_µs, 20_µs,
+                                                                 40_µs, 80_µs, 160_µs.
+- `k8s_kubelet.apiserver_storage_data_key_generation_latencies_percent`: API Server Latencies Of
+                                                                         Data Encryption Key(DEK)
+                                                                         Generation Operations
+                                                                         Percentage (percentage).
+                                                                         Dimensions: 5_µs, 10_µs,
+                                                                         20_µs, 40_µs, 80_µs,
+                                                                         160_µs.
+- `k8s_kubelet.apiserver_storage_envelope_transformation_cache_misses`: API Server Storage Envelope
+                                                                        Transformation Cache Misses
+                                                                        (events/s). Dimensions:
+                                                                        cache misses.
+- `k8s_kubelet.kubelet_containers_running`: Number Of Containers Currently Running
+                                            (running_containers). Dimensions: total.
+- `k8s_kubelet.kubelet_pods_running`: Number Of Pods Currently Running (running_pods). Dimensions:
+                                      total.
+- `k8s_kubelet.kubelet_pods_log_filesystem_used_bytes`: Bytes Used By The Pod Logs On The Filesystem
+                                                        (B).
+- `k8s_kubelet.kubelet_runtime_operations`: Runtime Operations By Type (operations/s).
+- `k8s_kubelet.kubelet_runtime_operations_errors`: Runtime Operations Errors By Type (errors/s).
+- `k8s_kubelet.kubelet_docker_operations`: Docker Operations By Type (operations/s).
+- `k8s_kubelet.kubelet_docker_operations_errors`: Docker Operations Errors By Type (errors/s).
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[k8s_kubelet.apiserver_audit_requests_rejected, k8s_kubelet.apiserver_storage_data_key_generation_failures, k8s_kubelet.apiserver_storage_data_key_generation_latencies, k8s_kubelet.apiserver_storage_data_key_generation_latencies_percent, k8s_kubelet.apiserver_storage_envelope_transformation_cache_misses, k8s_kubelet.kubelet_containers_running] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Kubernetes Kubelet service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="k8s_kubelet.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="k8s_kubelet.apiserver_audit_requests_rejected"
 ```
 
 ## When to escalate out of this skill

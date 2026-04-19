@@ -89,17 +89,36 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Availability
+
+These are the real Netdata chart contexts the native collector emits for RabbitMQ. Use these names
+verbatim in `query_metrics` calls.
+
+- `rabbitmq.objects_count`: Objects (messages). Dimensions: channels, consumers, connections,
+                            queues, exchanges.
+- `rabbitmq.connection_churn_rate`: Connection churn (operations/s). Dimensions: created, closed.
+- `rabbitmq.node_avail_status`: Node Availability Status (status). Dimensions: running, down.
+- `rabbitmq.node_network_partition_status`: Node Network Partitioning Status (status). Dimensions:
+                                            clear, detected.
+- `rabbitmq.node_mem_alarm_status`: Node Memory Alarm Status (status). Dimensions: clear, triggered.
+- `rabbitmq.node_disk_free_alarm_status`: Node Disk Free Alarm Status (status). Dimensions: clear,
+                                          triggered.
+- `rabbitmq.node_uptime`: Node Uptime (seconds). Dimensions: uptime.
+- `rabbitmq.vhost_status`: Vhost Status (status). Dimensions: running, stopped, partial.
+- `rabbitmq.queue_status`: Queue status (status). Dimensions: running, down, idle, crashed, stopped,
+                           minority.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[rabbitmq.objects_count, rabbitmq.connection_churn_rate, rabbitmq.node_avail_status, rabbitmq.node_network_partition_status, rabbitmq.node_mem_alarm_status, rabbitmq.node_disk_free_alarm_status] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the RabbitMQ service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="rabbitmq.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="rabbitmq.objects_count"
 ```
 
 ## When to escalate out of this skill

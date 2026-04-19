@@ -61,17 +61,37 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Worker Pool Utilization
+
+These are the real Netdata chart contexts the native collector emits for Uwsgi. Use these names
+verbatim in `query_metrics` calls.
+
+- `uwsgi.worker_transmitted_data`: UWSGI Worker Transmitted Data (bytes/s). Dimensions: tx.
+- `uwsgi.worker_requests`: UWSGI Worker Requests (requests/s). Dimensions: requests.
+- `uwsgi.worker_delta_requests`: UWSGI Worker Delta Requests (requests/s). Dimensions:
+                                 delta_requests.
+- `uwsgi.worker_average_request_time`: UWSGI Worker Average Request Time (milliseconds). Dimensions:
+                                       avg.
+- `uwsgi.worker_harakiris`: UWSGI Worker Dropped Requests (harakiris/s). Dimensions: harakiris.
+- `uwsgi.worker_exceptions`: UWSGI Worker Raised Exceptions (exceptions/s). Dimensions: exceptions.
+- `uwsgi.worker_status`: UWSGI Worker Status (status). Dimensions: idle, busy, cheap, pause, sig.
+- `uwsgi.worker_request_handling_status`: UWSGI Worker Request Handling Status (status). Dimensions:
+                                          accepting, not_accepting.
+- `uwsgi.worker_respawns`: UWSGI Worker Respawns (respawns/s). Dimensions: respawns.
+- `uwsgi.worker_memory_rss`: UWSGI Worker Memory RSS (Resident Set Size) (bytes). Dimensions: rss.
+- `uwsgi.worker_memory_vsz`: UWSGI Worker Memory VSZ (Virtual Memory Size) (bytes). Dimensions: vsz.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[uwsgi.worker_transmitted_data, uwsgi.worker_requests, uwsgi.worker_delta_requests, uwsgi.worker_average_request_time, uwsgi.worker_harakiris, uwsgi.worker_exceptions] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Uwsgi service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="uwsgi.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="uwsgi.worker_transmitted_data"
 ```
 
 ## When to escalate out of this skill

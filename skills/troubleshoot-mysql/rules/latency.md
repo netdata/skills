@@ -52,17 +52,40 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Latency
+
+These are the real Netdata chart contexts the native collector emits for MySQL. Use these names
+verbatim in `query_metrics` calls.
+
+- `mysql.queries`: Queries (queries/s). Dimensions: queries, questions, slow_queries.
+- `mysql.table_locks`: Table Locks (locks/s). Dimensions: immediate, waited.
+- `mysql.innodb_log`: InnoDB Log Operations (operations/s). Dimensions: waits, write_requests,
+                      writes.
+- `mysql.innodb_cur_row_lock`: InnoDB Current Row Locks (operations). Dimensions: current waits.
+- `mysql.innodb_buffer_pool_ops`: InnoDB Buffer Pool Operations (operations/s). Dimensions:
+                                  disk_reads, wait_free.
+- `mysql.process_list_fetch_query_duration`: Process List Fetch Duration (milliseconds). Dimensions:
+                                             duration.
+- `mysql.process_list_longest_query_duration`: Longest Query Duration (seconds). Dimensions:
+                                               duration.
+- `mysql.userstats_cpu`: User CPU Time (percentage). Dimensions: used.
+- `mysql.queries`: Queries (queries/s). Dimensions: queries, questions, slow_queries.
+- `mysql.table_locks`: Table Locks (locks/s). Dimensions: immediate, waited.
+- `mysql.innodb_log`: InnoDB Log Operations (operations/s). Dimensions: waits, write_requests,
+                      writes.
+- `mysql.innodb_cur_row_lock`: InnoDB Current Row Locks (operations). Dimensions: current waits.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[mysql.queries, mysql.table_locks, mysql.innodb_log, mysql.innodb_cur_row_lock, mysql.innodb_buffer_pool_ops, mysql.process_list_fetch_query_duration] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the MySQL service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="mysql.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="mysql.queries"
 ```
 
 ## When to escalate out of this skill

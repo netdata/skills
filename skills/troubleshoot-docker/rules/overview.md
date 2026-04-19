@@ -46,17 +46,37 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Overview
+
+These are the real Netdata chart contexts the native collector emits for Docker. Use these names
+verbatim in `query_metrics` calls.
+
+- `docker.containers_state`: Total number of Docker containers in various states (containers).
+                             Dimensions: running, paused, stopped.
+- `docker.containers_health_status`: Total number of Docker containers in various health states
+                                     (containers). Dimensions: healthy, unhealthy,
+                                     not_running_unhealthy, starting, no_healthcheck.
+- `docker.images`: Total number of Docker images in various states (images). Dimensions: active,
+                   dangling.
+- `docker.images_size`: Total size of all Docker images (bytes). Dimensions: size.
+- `docker.container_state`: Docker container state (state). Dimensions: running, paused, exited,
+                            created, restarting, removing.
+- `docker.container_health_status`: Docker container health status (status). Dimensions: healthy,
+                                    unhealthy, not_running_unhealthy, starting, no_healthcheck.
+- `docker.container_writeable_layer_size`: Docker container writable layer size (size). Dimensions:
+                                           writeable_layer.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[docker.containers_state, docker.containers_health_status, docker.images, docker.images_size, docker.container_state, docker.container_health_status] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Docker service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="docker.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="docker.containers_state"
 ```
 
 ## When to escalate out of this skill

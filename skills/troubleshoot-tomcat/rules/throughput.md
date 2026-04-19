@@ -64,17 +64,27 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Throughput
+
+These are the real Netdata chart contexts the native collector emits for Apache Tomcat. Use these
+names verbatim in `query_metrics` calls.
+
+- `tomcat.jvm_memory_usage`: Requests (bytes). Dimensions: free, used.
+- `tomcat.connector_requests`: Connector Requests (requests/s). Dimensions: requests.
+- `tomcat.connector_requests_processing_time`: Connector Requests Processing Time (milliseconds).
+                                               Dimensions: processing_time.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[tomcat.jvm_memory_usage, tomcat.connector_requests, tomcat.connector_requests_processing_time] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Apache Tomcat service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="tomcat.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="tomcat.jvm_memory_usage"
 ```
 
 ## When to escalate out of this skill

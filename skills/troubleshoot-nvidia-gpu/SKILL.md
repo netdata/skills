@@ -49,6 +49,9 @@ tags:
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your Nvidia Gpu instrumentation adds. Both paths end at the
   same MCP query surface.
+- Netdata's nvidia_smi collector emits 18 context(s) under `nvidia_smi.*`. The rule files enumerate
+  which contexts surface which domain; the Verification section below names the load-bearing ones
+  explicitly.
 
 ## Step-by-step
 
@@ -83,15 +86,15 @@ tags:
 
 ```text
 # Discover metrics from Nvidia Gpu
-list_metrics with optional filter by context prefix
+list_metrics with q="nvidia_smi"
 
-# Pull a specific signal over the last window
-query_metrics with context=<signal>, relative_window=-15m
+# Pull a specific context over the last window
+query_metrics with context="nvidia_smi.gpu_mig_mode_current_status", relative_window=-15m
 
 # Rank anomalies for the service or host
-find_anomalous_metrics with host=<host> or service=<service>
+find_anomalous_metrics with node=<host> and context_pattern="nvidia_smi.*"
 
-# Correlate a known problem signal with others
+# Correlate a known problem context with others
 find_correlated_metrics around the incident window
 
 # Show current alert state
@@ -115,25 +118,29 @@ list_raised_alerts scoped to the node
 
 ## Verification
 
-Run these MCP queries against the Netdata instance that sees the Nvidia Gpu service:
+Run these MCP queries against the Netdata instance that sees the Nvidia Gpu service. Every context
+listed below is a real Netdata chart name; the agent does not need to guess.
 
 ```text
-1. list_metrics filtered by the Nvidia Gpu service's context prefix.
-2. query_metrics for the key signals from the first-triggered domain over the last 30 minutes.
-3. find_anomalous_metrics scoped to the same service/time window.
+1. list_metrics filtered by q="nvidia_smi" (returns every nvidia_smi.* context Netdata sees)
+2. query_metrics with contexts=[nvidia_smi.gpu_mig_mode_current_status, nvidia_smi.gpu_pcie_bandwidth_usage, nvidia_smi.gpu_memory_utilization, nvidia_smi.gpu_frame_buffer_memory_usage, nvidia_smi.gpu_bar1_memory_usage, nvidia_smi.gpu_mig_frame_buffer_memory_usage] and relative_window=-30m
+3. find_anomalous_metrics filtered by node=<host> and context_pattern="nvidia_smi.*"
 ```
 
-Signals the playbook considers load-bearing:
+Load-bearing contexts for this service:
 
-  - GPU Reachability (Driver Communication)
-  - Management Path Latency / Driver Health
-  - Persistence Mode Status
-  - GPU Die Temperature
-  - HBM Memory Temperature
-  - Power Draw
+- `nvidia_smi.gpu_mig_mode_current_status`: MIG current mode (status). Dimensions: enabled,
+                                            disabled.
+- `nvidia_smi.gpu_pcie_bandwidth_usage`: PCI Express Bandwidth Usage (B/s). Dimensions: rx, tx.
+- `nvidia_smi.gpu_memory_utilization`: Memory utilization (%). Dimensions: memory.
+- `nvidia_smi.gpu_frame_buffer_memory_usage`: Frame buffer memory usage (B). Dimensions: free, used,
+                                              reserved.
+- `nvidia_smi.gpu_bar1_memory_usage`: BAR1 memory usage (B). Dimensions: free, used.
+- `nvidia_smi.gpu_mig_frame_buffer_memory_usage`: Frame buffer memory usage (B). Dimensions: free,
+                                                  used, reserved.
 
-A clean result means every key signal is within its expected band and the `find_anomalous_metrics`
-list is empty or contains only already-acknowledged items. If the fix was real, re-running the same
+A clean result means every context is within its expected band and the `find_anomalous_metrics` list
+is empty or contains only already-acknowledged items. If the fix was real, re-running the same
 queries 10 minutes after applying it will show a clean result. If it does not, revert and look
 deeper.
 

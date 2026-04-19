@@ -57,6 +57,9 @@ tags:
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your PHP-FPM instrumentation adds. Both paths end at the same
   MCP query surface.
+- Netdata's phpfpm collector emits 6 context(s) under `phpfpm.*`. The rule files enumerate which
+  contexts surface which domain; the Verification section below names the load-bearing ones
+  explicitly.
 
 ## Step-by-step
 
@@ -95,15 +98,15 @@ tags:
 
 ```text
 # Discover metrics from PHP-FPM
-list_metrics with optional filter by context prefix
+list_metrics with q="phpfpm"
 
-# Pull a specific signal over the last window
-query_metrics with context=<signal>, relative_window=-15m
+# Pull a specific context over the last window
+query_metrics with context="phpfpm.connections", relative_window=-15m
 
 # Rank anomalies for the service or host
-find_anomalous_metrics with host=<host> or service=<service>
+find_anomalous_metrics with node=<host> and context_pattern="phpfpm.*"
 
-# Correlate a known problem signal with others
+# Correlate a known problem context with others
 find_correlated_metrics around the incident window
 
 # Show current alert state
@@ -127,23 +130,29 @@ list_raised_alerts scoped to the node
 
 ## Verification
 
-Run these MCP queries against the Netdata instance that sees the PHP-FPM service:
+Run these MCP queries against the Netdata instance that sees the PHP-FPM service. Every context
+listed below is a real Netdata chart name; the agent does not need to guess.
 
 ```text
-1. list_metrics filtered by the PHP-FPM service's context prefix.
-2. query_metrics for the key signals from the first-triggered domain over the last 30 minutes.
-3. find_anomalous_metrics scoped to the same service/time window.
+1. list_metrics filtered by q="phpfpm" (returns every phpfpm.* context Netdata sees)
+2. query_metrics with contexts=[phpfpm.connections, phpfpm.requests, phpfpm.performance, phpfpm.request_duration, phpfpm.request_cpu, phpfpm.request_mem] and relative_window=-30m
+3. find_anomalous_metrics filtered by node=<host> and context_pattern="phpfpm.*"
 ```
 
-Signals the playbook considers load-bearing:
+Load-bearing contexts for this service:
 
-  - Service Liveness (Ping/Health Check)
-  - Listen Queue Depth
-  - Active Worker Count
-  - Idle Worker Count
+- `phpfpm.connections`: Active Connections (connections). Dimensions: active, max_active, idle.
+- `phpfpm.requests`: Requests (requests/s). Dimensions: requests.
+- `phpfpm.performance`: Performance (status). Dimensions: max_children_reached, slow_requests.
+- `phpfpm.request_duration`: Requests Duration Among All Idle Processes (milliseconds). Dimensions:
+                             min, max, avg.
+- `phpfpm.request_cpu`: Last Request CPU Usage Among All Idle Processes (percentage). Dimensions:
+                        min, max, avg.
+- `phpfpm.request_mem`: Last Request Memory Usage Among All Idle Processes (KB). Dimensions: min,
+                        max, avg.
 
-A clean result means every key signal is within its expected band and the `find_anomalous_metrics`
-list is empty or contains only already-acknowledged items. If the fix was real, re-running the same
+A clean result means every context is within its expected band and the `find_anomalous_metrics` list
+is empty or contains only already-acknowledged items. If the fix was real, re-running the same
 queries 10 minutes after applying it will show a clean result. If it does not, revert and look
 deeper.
 

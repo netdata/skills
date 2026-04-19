@@ -49,6 +49,9 @@ tags:
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your Oracle Database instrumentation adds. Both paths end at
   the same MCP query surface.
+- Netdata's oracledb collector emits 18 context(s) under `oracledb.*`. The rule files enumerate
+  which contexts surface which domain; the Verification section below names the load-bearing ones
+  explicitly.
 
 ## Step-by-step
 
@@ -84,15 +87,15 @@ tags:
 
 ```text
 # Discover metrics from Oracle Database
-list_metrics with optional filter by context prefix
+list_metrics with q="oracledb"
 
-# Pull a specific signal over the last window
-query_metrics with context=<signal>, relative_window=-15m
+# Pull a specific context over the last window
+query_metrics with context="oracledb.global_cache_blocks", relative_window=-15m
 
 # Rank anomalies for the service or host
-find_anomalous_metrics with host=<host> or service=<service>
+find_anomalous_metrics with node=<host> and context_pattern="oracledb.*"
 
-# Correlate a known problem signal with others
+# Correlate a known problem context with others
 find_correlated_metrics around the incident window
 
 # Show current alert state
@@ -116,20 +119,26 @@ list_raised_alerts scoped to the node
 
 ## Verification
 
-Run these MCP queries against the Netdata instance that sees the Oracle Database service:
+Run these MCP queries against the Netdata instance that sees the Oracle Database service. Every
+context listed below is a real Netdata chart name; the agent does not need to guess.
 
 ```text
-1. list_metrics filtered by the Oracle Database service's context prefix.
-2. query_metrics for the key signals from the first-triggered domain over the last 30 minutes.
-3. find_anomalous_metrics scoped to the same service/time window.
+1. list_metrics filtered by q="oracledb" (returns every oracledb.* context Netdata sees)
+2. query_metrics with contexts=[oracledb.global_cache_blocks, oracledb.enqueue_timeouts, oracledb.disk_iops, oracledb.database_wait_time_ratio, oracledb.sorts, oracledb.cache_hit_ratio] and relative_window=-30m
+3. find_anomalous_metrics filtered by node=<host> and context_pattern="oracledb.*"
 ```
 
-Signals the playbook considers load-bearing:
+Load-bearing contexts for this service:
 
-  - the specific signals listed in the domain rule files
+- `oracledb.global_cache_blocks`: Global Cache Blocks (blocks/s). Dimensions: corrupted, lost.
+- `oracledb.enqueue_timeouts`: Enqueue Timeouts (timeouts/s). Dimensions: enqueue.
+- `oracledb.disk_iops`: Disk IOPS (operations/s). Dimensions: read, write.
+- `oracledb.database_wait_time_ratio`: Database Wait Time Ratio (percent). Dimensions: db_wait_time.
+- `oracledb.sorts`: Sorts (sorts/s). Dimensions: memory, disk.
+- `oracledb.cache_hit_ratio`: Cache Hit Ratio (percent). Dimensions: buffer, cursor, library, row.
 
-A clean result means every key signal is within its expected band and the `find_anomalous_metrics`
-list is empty or contains only already-acknowledged items. If the fix was real, re-running the same
+A clean result means every context is within its expected band and the `find_anomalous_metrics` list
+is empty or contains only already-acknowledged items. If the fix was real, re-running the same
 queries 10 minutes after applying it will show a clean result. If it does not, revert and look
 deeper.
 

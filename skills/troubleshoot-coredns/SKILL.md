@@ -50,6 +50,9 @@ tags:
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your CoreDNS instrumentation adds. Both paths end at the same
   MCP query surface.
+- Netdata's coredns collector emits 22 context(s) under `coredns.*`. The rule files enumerate which
+  contexts surface which domain; the Verification section below names the load-bearing ones
+  explicitly.
 
 ## Step-by-step
 
@@ -85,15 +88,15 @@ tags:
 
 ```text
 # Discover metrics from CoreDNS
-list_metrics with optional filter by context prefix
+list_metrics with q="coredns"
 
-# Pull a specific signal over the last window
-query_metrics with context=<signal>, relative_window=-15m
+# Pull a specific context over the last window
+query_metrics with context="coredns.dns_request_count_total_per_status", relative_window=-15m
 
 # Rank anomalies for the service or host
-find_anomalous_metrics with host=<host> or service=<service>
+find_anomalous_metrics with node=<host> and context_pattern="coredns.*"
 
-# Correlate a known problem signal with others
+# Correlate a known problem context with others
 find_correlated_metrics around the incident window
 
 # Show current alert state
@@ -117,20 +120,35 @@ list_raised_alerts scoped to the node
 
 ## Verification
 
-Run these MCP queries against the Netdata instance that sees the CoreDNS service:
+Run these MCP queries against the Netdata instance that sees the CoreDNS service. Every context
+listed below is a real Netdata chart name; the agent does not need to guess.
 
 ```text
-1. list_metrics filtered by the CoreDNS service's context prefix.
-2. query_metrics for the key signals from the first-triggered domain over the last 30 minutes.
-3. find_anomalous_metrics scoped to the same service/time window.
+1. list_metrics filtered by q="coredns" (returns every coredns.* context Netdata sees)
+2. query_metrics with contexts=[coredns.dns_request_count_total_per_status, coredns.server_request_count_total_per_status, coredns.dns_no_matching_zone_dropped_total, coredns.dns_responses_count_total_per_rcode, coredns.server_responses_count_total_per_rcode, coredns.zone_responses_count_total_per_rcode] and relative_window=-30m
+3. find_anomalous_metrics filtered by node=<host> and context_pattern="coredns.*"
 ```
 
-Signals the playbook considers load-bearing:
+Load-bearing contexts for this service:
 
-  - the specific signals listed in the domain rule files
+- `coredns.dns_request_count_total_per_status`: Number Of Processed And Dropped DNS Requests
+                                                (requests/s). Dimensions: processed, dropped.
+- `coredns.server_request_count_total_per_status`: Number Of Processed And Dropped DNS Requests
+                                                   (requests/s). Dimensions: processed, dropped.
+- `coredns.dns_no_matching_zone_dropped_total`: Number Of Dropped DNS Requests Because Of No
+                                                Matching Zone (requests/s). Dimensions: dropped.
+- `coredns.dns_responses_count_total_per_rcode`: Number Of DNS Responses Per Rcode (responses/s).
+                                                 Dimensions: noerror, formerr, servfail, nxdomain,
+                                                 notimp, refused.
+- `coredns.server_responses_count_total_per_rcode`: Number Of DNS Responses Per Rcode (responses/s).
+                                                    Dimensions: noerror, formerr, servfail,
+                                                    nxdomain, notimp, refused.
+- `coredns.zone_responses_count_total_per_rcode`: Number Of DNS Responses Per Rcode (responses/s).
+                                                  Dimensions: noerror, formerr, servfail, nxdomain,
+                                                  notimp, refused.
 
-A clean result means every key signal is within its expected band and the `find_anomalous_metrics`
-list is empty or contains only already-acknowledged items. If the fix was real, re-running the same
+A clean result means every context is within its expected band and the `find_anomalous_metrics` list
+is empty or contains only already-acknowledged items. If the fix was real, re-running the same
 queries 10 minutes after applying it will show a clean result. If it does not, revert and look
 deeper.
 

@@ -89,17 +89,36 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Storage
+
+These are the real Netdata chart contexts the native collector emits for VMware vSphere. Use these
+names verbatim in `query_metrics` calls.
+
+- `vsphere.vm_cpu_utilization`: Virtual Machine CPU utilization (percentage). Dimensions: used.
+- `vsphere.vm_mem_utilization`: Virtual Machine memory utilization (percentage). Dimensions: used.
+- `vsphere.vm_mem_swap_io`: Virtual Machine VMKernel memory swap IO (KiB/s). Dimensions: in, out.
+- `vsphere.vm_disk_io`: Virtual Machine disk IO (KiB/s). Dimensions: read, write.
+- `vsphere.vm_disk_max_latency`: Virtual Machine disk max latency (milliseconds). Dimensions:
+                                 latency.
+- `vsphere.host_cpu_utilization`: ESXi Host CPU utilization (percentage). Dimensions: used.
+- `vsphere.host_mem_utilization`: ESXi Host memory utilization (percentage). Dimensions: used.
+- `vsphere.host_mem_swap_io`: ESXi Host VMKernel memory swap IO (KiB/s). Dimensions: in, out.
+- `vsphere.host_disk_io`: ESXi Host disk IO (KiB/s). Dimensions: read, write.
+- `vsphere.host_disk_max_latency`: ESXi Host disk max latency (milliseconds). Dimensions: latency.
+- `vsphere.datastore_disk_io`: Datastore disk IO (KiB/s). Dimensions: read, write.
+- `vsphere.datastore_disk_iops`: Datastore disk IOPS (operations/s). Dimensions: reads, writes.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[vsphere.vm_cpu_utilization, vsphere.vm_mem_utilization, vsphere.vm_mem_swap_io, vsphere.vm_disk_io, vsphere.vm_disk_max_latency, vsphere.host_cpu_utilization] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the VMware vSphere service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="vsphere.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="vsphere.vm_cpu_utilization"
 ```
 
 ## When to escalate out of this skill

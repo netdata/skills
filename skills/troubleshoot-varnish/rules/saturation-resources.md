@@ -108,17 +108,32 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Saturation & Resources
+
+These are the real Netdata chart contexts the native collector emits for Varnish Cache. Use these
+names verbatim in `query_metrics` calls.
+
+- `varnish.cache_hit_ratio_total`: Cache Hit Ratio Total (percent). Dimensions: hit, miss, hitpass,
+                                   hitmiss.
+- `varnish.cache_hit_ratio_delta`: Cache Hit Ratio Current Poll (percent). Dimensions: hit, miss,
+                                   hitpass, hitmiss.
+- `varnish.cache_expired_objects`: Cache Expired Objects (objects/s). Dimensions: expired.
+- `varnish.cache_lru_activity`: Cache LRU Activity (objects/s). Dimensions: nuked, moved.
+- `varnish.threads`: Threads In All Pools (threads). Dimensions: threads.
+- `varnish.storage_space_usage`: Storage Space Usage (bytes). Dimensions: free, used.
+- `varnish.storage_allocated_objects`: Storage Allocated Objects (objects). Dimensions: allocated.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[varnish.cache_hit_ratio_total, varnish.cache_hit_ratio_delta, varnish.cache_expired_objects, varnish.cache_lru_activity, varnish.threads, varnish.storage_space_usage] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Varnish Cache service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="varnish.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="varnish.cache_hit_ratio_total"
 ```
 
 ## When to escalate out of this skill

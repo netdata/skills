@@ -89,17 +89,40 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Errors
+
+These are the real Netdata chart contexts the native collector emits for MySQL. Use these names
+verbatim in `query_metrics` calls.
+
+- `mysql.connection_errors`: Connection Errors (errors/s). Dimensions: accept, internal, max,
+                             peer_addr, select, tcpwrap.
+- `mysql.galera_conflicts`: Replication Conflicts (transactions). Dimensions: bf_aborts, cert_fails.
+- `mysql.galera_cluster_state`: Cluster Component State (state). Dimensions: undefined, joining,
+                                donor, joined, synced, error.
+- `mysql.userstats_denied_commands`: User Denied Commands (commands/s). Dimensions: denied.
+- `mysql.userstats_denied_connections`: User Denied Connections (connections/s). Dimensions: denied.
+- `mysql.connection_errors`: Connection Errors (errors/s). Dimensions: accept, internal, max,
+                             peer_addr, select, tcpwrap.
+- `mysql.galera_conflicts`: Replication Conflicts (transactions). Dimensions: bf_aborts, cert_fails.
+- `mysql.galera_cluster_state`: Cluster Component State (state). Dimensions: undefined, joining,
+                                donor, joined, synced, error.
+- `mysql.userstats_denied_commands`: User Denied Commands (commands/s). Dimensions: denied.
+- `mysql.userstats_denied_connections`: User Denied Connections (connections/s). Dimensions: denied.
+- `mysql.connection_errors`: Connection Errors (errors/s). Dimensions: accept, internal, max,
+                             peer_addr, select, tcpwrap.
+- `mysql.galera_conflicts`: Replication Conflicts (transactions). Dimensions: bf_aborts, cert_fails.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[mysql.connection_errors, mysql.galera_conflicts, mysql.galera_cluster_state, mysql.userstats_denied_commands, mysql.userstats_denied_connections, mysql.connection_errors] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the MySQL service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="mysql.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="mysql.connection_errors"
 ```
 
 ## When to escalate out of this skill

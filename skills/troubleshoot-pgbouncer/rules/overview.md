@@ -46,17 +46,41 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Overview
+
+These are the real Netdata chart contexts the native collector emits for PgBouncer. Use these names
+verbatim in `query_metrics` calls.
+
+- `pgbouncer.client_connections_utilization`: Client connections utilization (percentage).
+                                              Dimensions: used.
+- `pgbouncer.db_client_connections`: Database client connections (connections). Dimensions: active,
+                                     waiting, cancel_req.
+- `pgbouncer.db_server_connections`: Database server connections (connections). Dimensions: active,
+                                     idle, used, tested, login.
+- `pgbouncer.db_server_connections_utilization`: Database server connections utilization
+                                                 (percentage). Dimensions: used.
+- `pgbouncer.db_clients_wait_time`: Database clients wait time (seconds). Dimensions: time.
+- `pgbouncer.db_client_max_wait_time`: Database client max wait time (seconds). Dimensions: time.
+- `pgbouncer.db_transactions`: Database pooled SQL transactions (transactions/s). Dimensions:
+                               transactions.
+- `pgbouncer.db_transactions_time`: Database transactions time (seconds). Dimensions: time.
+- `pgbouncer.db_transaction_avg_time`: Database transaction average time (seconds). Dimensions:
+                                       time.
+- `pgbouncer.db_queries`: Database pooled SQL queries (queries/s). Dimensions: queries.
+- `pgbouncer.db_queries_time`: Database queries time (seconds). Dimensions: time.
+- `pgbouncer.db_query_avg_time`: Database query average time (seconds). Dimensions: time.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[pgbouncer.client_connections_utilization, pgbouncer.db_client_connections, pgbouncer.db_server_connections, pgbouncer.db_server_connections_utilization, pgbouncer.db_clients_wait_time, pgbouncer.db_client_max_wait_time] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the PgBouncer service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="pgbouncer.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="pgbouncer.client_connections_utilization"
 ```
 
 ## When to escalate out of this skill

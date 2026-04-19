@@ -42,6 +42,9 @@ tags:
 - Netdata observes the signals listed in the rule files via its native collectors, plus any
   OpenTelemetry-shipped metrics that your Apache ZooKeeper instrumentation adds. Both paths end at
   the same MCP query surface.
+- Netdata's zookeeper collector emits 17 context(s) under `zookeeper.*`. The rule files enumerate
+  which contexts surface which domain; the Verification section below names the load-bearing ones
+  explicitly.
 
 ## Step-by-step
 
@@ -71,15 +74,15 @@ tags:
 
 ```text
 # Discover metrics from Apache ZooKeeper
-list_metrics with optional filter by context prefix
+list_metrics with q="zookeeper"
 
-# Pull a specific signal over the last window
-query_metrics with context=<signal>, relative_window=-15m
+# Pull a specific context over the last window
+query_metrics with context="zookeeper.connections", relative_window=-15m
 
 # Rank anomalies for the service or host
-find_anomalous_metrics with host=<host> or service=<service>
+find_anomalous_metrics with node=<host> and context_pattern="zookeeper.*"
 
-# Correlate a known problem signal with others
+# Correlate a known problem context with others
 find_correlated_metrics around the incident window
 
 # Show current alert state
@@ -103,25 +106,26 @@ list_raised_alerts scoped to the node
 
 ## Verification
 
-Run these MCP queries against the Netdata instance that sees the Apache ZooKeeper service:
+Run these MCP queries against the Netdata instance that sees the Apache ZooKeeper service. Every
+context listed below is a real Netdata chart name; the agent does not need to guess.
 
 ```text
-1. list_metrics filtered by the Apache ZooKeeper service's context prefix.
-2. query_metrics for the key signals from the first-triggered domain over the last 30 minutes.
-3. find_anomalous_metrics scoped to the same service/time window.
+1. list_metrics filtered by q="zookeeper" (returns every zookeeper.* context Netdata sees)
+2. query_metrics with contexts=[zookeeper.connections, zookeeper.connections_dropped, zookeeper.connections_rejected, zookeeper.uptime, zookeeper.stale_requests_dropped, zookeeper.auth_fails] and relative_window=-30m
+3. find_anomalous_metrics filtered by node=<host> and context_pattern="zookeeper.*"
 ```
 
-Signals the playbook considers load-bearing:
+Load-bearing contexts for this service:
 
-  - Server State (Role)
-  - Service Liveness
-  - Looking Count (Election Events)
-  - Request Latency (Aggregated)
-  - Write Latency (Update Latency)
-  - Read Latency
+- `zookeeper.connections`: Alive Connections (connections). Dimensions: alive.
+- `zookeeper.connections_dropped`: Dropped Connections (connections/s). Dimensions: dropped.
+- `zookeeper.connections_rejected`: Rejected Connections (connections/s). Dimensions: rejected.
+- `zookeeper.uptime`: Uptime (seconds). Dimensions: uptime.
+- `zookeeper.stale_requests_dropped`: Stale Requests Dropped (requests/s). Dimensions: dropped.
+- `zookeeper.auth_fails`: Auth Fails (fails/s). Dimensions: auth.
 
-A clean result means every key signal is within its expected band and the `find_anomalous_metrics`
-list is empty or contains only already-acknowledged items. If the fix was real, re-running the same
+A clean result means every context is within its expected band and the `find_anomalous_metrics` list
+is empty or contains only already-acknowledged items. If the fix was real, re-running the same
 queries 10 minutes after applying it will show a clean result. If it does not, revert and look
 deeper.
 

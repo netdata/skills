@@ -56,17 +56,40 @@ playbook's SECTION 3 (Failure Patterns) or SECTION 4 (Runbooks). Before applying
 3. Re-run the same MCP queries after the remediation settles. Recording before/after numbers is how
    a runbook entry gets sharpened over time.
 
+## Netdata contexts that surface Throughput
+
+These are the real Netdata chart contexts the native collector emits for Apache Cassandra. Use these
+names verbatim in `query_metrics` calls.
+
+- `cassandra.client_requests_rate`: Client requests rate (requests/s). Dimensions: read, write.
+- `cassandra.client_requests_latency`: Client requests total latency (seconds). Dimensions: read,
+                                       write.
+- `cassandra.row_cache_hit_rate`: Key cache hit rate (events/s). Dimensions: hits, misses.
+- `cassandra.key_cache_hit_rate`: Row cache hit rate (events/s). Dimensions: hits, misses.
+- `cassandra.compaction_completed_tasks_rate`: Completed compactions rate (tasks/s). Dimensions:
+                                               completed.
+- `cassandra.compaction_compacted_rate`: Compaction data rate (bytes/s). Dimensions: compacted.
+- `cassandra.jvm_gc_rate`: Garbage collections rate (gc/s). Dimensions: parnew, cms.
+- `cassandra.dropped_messages_rate`: Dropped messages rate (messages/s). Dimensions: dropped.
+- `cassandra.client_requests_timeouts_rate`: Client requests timeouts rate (timeout/s). Dimensions:
+                                             read, write.
+- `cassandra.client_requests_unavailables_rate`: Client requests unavailable exceptions rate
+                                                 (exceptions/s). Dimensions: read, write.
+- `cassandra.client_requests_failures_rate`: Client requests failures rate (failures/s). Dimensions:
+                                             read, write.
+- `cassandra.storage_exceptions_rate`: Storage exceptions rate (exceptions/s). Dimensions: storage.
+
 ## MCP query examples for this domain
 
 ```text
-# Pull every signal in this domain at once
-query_metrics with contexts=[<signals from the list above>] and relative_window=-30m
+# Pull every context in this domain at once
+query_metrics with contexts=[cassandra.client_requests_rate, cassandra.client_requests_latency, cassandra.row_cache_hit_rate, cassandra.key_cache_hit_rate, cassandra.compaction_completed_tasks_rate, cassandra.compaction_compacted_rate] and relative_window=-30m
 
-# Ask the agent to rank anomalies that match this domain
-find_anomalous_metrics filtered by any attribute unique to the Apache Cassandra service (usually service.name or host.name)
+# Rank anomalies that match this domain
+find_anomalous_metrics with node=<host> and context_pattern="cassandra.*"
 
-# Look for correlated signals outside this domain
-find_correlated_metrics around the incident window, limit 15
+# Correlate a problem context with others outside the domain
+find_correlated_metrics around the incident window, anchor_context="cassandra.client_requests_rate"
 ```
 
 ## When to escalate out of this skill
