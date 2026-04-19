@@ -42,8 +42,13 @@ referenced in the `References` section for deeper guidance.
 
 - Claim that Netdata accepts OTLP traces yet. It does not (as of v0.1.0 of
   these skills). Route traces to a different backend.
-- Claim that `_nd_chart_instance` is a valid OTLP attribute. It does not
-  exist in Netdata's source.
+- Claim that `_nd_chart_instance` or `_nd_dimension` is a valid
+  producer-side OTLP attribute. `_nd_chart_instance` does not exist
+  in Netdata's source at all. `_nd_dimension` exists only inside
+  Netdata's OTel consumer (histogram flattening); producers must not
+  emit it. Chart layout is controlled by mapping files under
+  `/etc/netdata/otel.d/v1/metrics/` via `dimension_attribute_key`,
+  not by producer-side annotations.
 - Emit em-dashes in content you write for this repo. Use colons, semicolons,
   commas, or restructure.
 

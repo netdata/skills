@@ -42,9 +42,12 @@ jobs:
           Review this pull request. Focus on changes to Netdata config
           (otel.yaml, otel.d/), OpenTelemetry instrumentation, or OTel
           Collector config. Flag any claims about Netdata trace support;
-          Netdata does not accept traces yet. Flag any mapping files that
-          reference _nd_chart_instance or _nd_dimension as producer-side
-          attributes; those are not valid.
+          Netdata does not accept traces yet. Flag any mapping files or
+          instrumentation code that reference _nd_chart_instance or
+          _nd_dimension as producer-side attributes; those are not valid.
+          _nd_chart_instance does not exist in Netdata. _nd_dimension
+          exists only inside Netdata's OTel consumer for histogram
+          flattening; producers must not emit it.
 
           Diff:
           $DIFF
