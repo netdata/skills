@@ -23,6 +23,76 @@ except ImportError:
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 SKILLS_DIR = REPO_ROOT / "skills"
 
+# Netdata source tree. Optional: present on a dev machine with the
+# reference clone; absent in some CI images. Context-reality checks
+# silently no-op when absent.
+NETDATA_DIR = REPO_ROOT.parent / "_reference" / "netdata"
+GO_COLLECTORS_DIR = NETDATA_DIR / "src" / "go" / "plugin" / "go.d" / "collector"
+
+# Keep this mapping in sync with scripts/generate-troubleshoot-skills.py.
+# The validator uses it to resolve troubleshoot-<slug> to the Netdata
+# collector dir whose metadata.yaml lists the real chart contexts.
+TIER2_COLLECTOR_MAP: dict[str, str] = {
+    "activemq": "activemq",
+    "apache-httpd": "apache",
+    "apache-pulsar": "pulsar",
+    "bind-dns": "bind",
+    "cassandra": "cassandra",
+    "ceph": "ceph",
+    "clickhouse": "clickhouse",
+    "cockroachdb": "cockroachdb",
+    "consul": "consul",
+    "coredns": "coredns",
+    "docker": "docker",
+    "docker-engine": "docker_engine",
+    "elasticsearch": "elasticsearch",
+    "envoy": "envoy",
+    "fluentd": "fluentd",
+    "haproxy": "haproxy",
+    "kubernetes-api-server": "k8s_apiserver",
+    "kubernetes-cluster-state": "k8s_state",
+    "kubernetes-kube-proxy": "k8s_kubeproxy",
+    "kubernetes-kubelet": "k8s_kubelet",
+    "logstash": "logstash",
+    "lvm": "lvm",
+    "memcached": "memcached",
+    "microsoft-sql-server": "mssql",
+    "mongodb": "mongodb",
+    "mysql": "mysql",
+    "nats": "nats",
+    "nginx": "nginx",
+    "nvidia-dcgm": "dcgm",
+    "nvidia-gpu": "nvidia_smi",
+    "nvme": "nvme",
+    "oracle-database": "oracledb",
+    "pgbouncer": "pgbouncer",
+    "php-fpm": "phpfpm",
+    "postfix": "postfix",
+    "postgresql": "postgres",
+    "proxysql": "proxysql",
+    "rabbitmq": "rabbitmq",
+    "redis": "redis",
+    "smartctl-disk-monitoring": "smartctl",
+    "tomcat": "tomcat",
+    "traefik": "traefik",
+    "uwsgi": "uwsgi",
+    "varnish": "varnish",
+    "vmware-vcsa": "vcsa",
+    "vmware-vsphere": "vsphere",
+    "zfs": "zfspool",
+    "zookeeper": "zookeeper",
+}
+
+# Namespaces for host / system / correlation contexts that may
+# legitimately appear in any rule file. A reference that matches one
+# of these prefixes is accepted without checking the collector file.
+# Keep tight: fabricated contexts tend to use tech-specific prefixes
+# we do enumerate, not these generic ones.
+ALWAYS_ALLOWED_CONTEXT_PREFIXES = {
+    "system", "host", "net", "disk", "cpu", "mem",
+    "app", "groups", "cgroup", "k8s", "container",
+}
+
 REQUIRED_FRONTMATTER_KEYS = {
     "name",
     "description",
@@ -139,6 +209,50 @@ def iter_skill_files() -> list[pathlib.Path]:
     if not SKILLS_DIR.exists():
         return []
     return sorted(SKILLS_DIR.glob("*/SKILL.md"))
+
+
+def iter_rule_files() -> list[pathlib.Path]:
+    """Return every rules/*.md file under every skill directory."""
+    if not SKILLS_DIR.exists():
+        return []
+    return sorted(SKILLS_DIR.glob("*/rules/*.md"))
+
+
+def load_real_contexts_for(skill_dir: pathlib.Path) -> set[str] | None:
+    """Return the set of real Netdata context names for a troubleshoot-*
+    skill, or None if this skill is not a Tier 2 troubleshoot skill with
+    a known collector mapping, or if the reference tree is not present.
+    """
+    name = skill_dir.name
+    if not name.startswith("troubleshoot-"):
+        return None
+    tech_slug = name[len("troubleshoot-") :]
+    coll = TIER2_COLLECTOR_MAP.get(tech_slug)
+    if not coll:
+        return None
+    md = GO_COLLECTORS_DIR / coll / "metadata.yaml"
+    if not md.is_file():
+        return None
+    try:
+        data = yaml.safe_load(md.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError:
+        return None
+    out: set[str] = set()
+    for mod in data.get("modules", []) or []:
+        for scope in (mod.get("metrics") or {}).get("scopes", []) or []:
+            for m in scope.get("metrics", []) or []:
+                name = (m.get("name") or "").strip()
+                if name and "." in name:
+                    out.add(name)
+    return out
+
+
+# Matches backtick-delimited inline code spans like `redis.commands` or
+# `postgres.replication_slot_files`. Only multi-segment dotted names
+# are considered candidates; single tokens (e.g. `INFO`) are ignored.
+CONTEXT_MENTION_RE = re.compile(
+    r"`([a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+)`"
+)
 
 
 def iter_repo_text_files() -> list[pathlib.Path]:
@@ -311,6 +425,103 @@ def check_repo_wide_forbidden_token(report: Report) -> None:
             )
 
 
+def validate_rule_file(report: Report, path: pathlib.Path) -> None:
+    """Check a rules/*.md file for style, structure, and any fabricated
+    Netdata context references.
+
+    Rule files carry no frontmatter (they are plain Markdown). The
+    checks overlap with validate_skill but the rule-file surface has
+    simpler structural requirements.
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        report.error(path, f"cannot read file: {exc}")
+        return
+
+    if not re.search(r"(?m)^#\s+\S", text):
+        report.error(path, "rule file has no H1 title")
+
+    prose, blocks = strip_code_blocks(text)
+    check_em_dashes(report, path, prose)
+    check_banned_phrases(report, path, prose)
+    check_no_emoji(report, path, text)
+    check_code_block_languages(report, path, blocks)
+    check_line_length(report, path, prose)
+
+    # Tier 2 context reality: every backtick-wrapped dotted token in
+    # this rule file that uses the tech's collector prefix must be a
+    # real context name. Tokens under generic namespaces (system.*,
+    # host.*, etc.) are always accepted.
+    skill_dir = path.parent.parent
+    real = load_real_contexts_for(skill_dir)
+    if real is None:
+        return
+
+    tech_slug = skill_dir.name[len("troubleshoot-") :]
+    coll = TIER2_COLLECTOR_MAP.get(tech_slug, "")
+    prefix = coll.replace("_", "") if coll else ""
+
+    for match in CONTEXT_MENTION_RE.finditer(text):
+        token = match.group(1)
+        head = token.split(".", 1)[0]
+        if head in ALWAYS_ALLOWED_CONTEXT_PREFIXES:
+            continue
+        # Only police tokens that use this collector's prefix. Tokens
+        # from unrelated namespaces (other techs cross-referenced) are
+        # out of scope here; they will be validated by their own skill.
+        if prefix and head != prefix and head != coll:
+            continue
+        if token not in real:
+            report.error(
+                path,
+                f"context `{token}` not present in "
+                f"{coll}/metadata.yaml (possibly fabricated)",
+            )
+
+
+def validate_tier2_has_real_contexts(
+    report: Report, skill_dir: pathlib.Path,
+) -> None:
+    """Tier 2 skills with a collector mapping must name at least three
+    real Netdata contexts across SKILL.md and rules/*.md combined.
+
+    Placeholder-only content ("list_metrics filtered by context prefix")
+    fails this check; the original bug that shipped v0.1.0 would have
+    been caught here.
+    """
+    real = load_real_contexts_for(skill_dir)
+    if not real:
+        return
+
+    seen: set[str] = set()
+    for md in [skill_dir / "SKILL.md", *sorted((skill_dir / "rules").glob("*.md"))]:
+        if not md.is_file():
+            continue
+        try:
+            text = md.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        for match in CONTEXT_MENTION_RE.finditer(text):
+            token = match.group(1)
+            if token in real:
+                seen.add(token)
+
+    # Collectors with very small metric surfaces (LVM and Postfix at
+    # the time of writing only emit 2 contexts each) get a proportional
+    # threshold: cite all of them, or cite at least 3 when the collector
+    # has more. Anything less looks like placeholder content.
+    expected = min(3, len(real))
+    if len(seen) < expected:
+        report.error(
+            skill_dir / "SKILL.md",
+            f"Tier 2 skill names {len(seen)} real Netdata "
+            f"context(s); expected at least {expected} out of "
+            f"{len(real)} available (check generator output and "
+            f"metadata.yaml mapping).",
+        )
+
+
 def validate_skill(report: Report, path: pathlib.Path) -> None:
     try:
         text = path.read_text(encoding="utf-8")
@@ -344,6 +555,17 @@ def main() -> int:
     for path in skills:
         validate_skill(report, path)
 
+    rules = iter_rule_files()
+    for path in rules:
+        validate_rule_file(report, path)
+
+    # Tier 2 realism: every troubleshoot-<tech> skill that has a known
+    # Netdata collector mapping must cite at least a few real contexts.
+    for skill_path in skills:
+        skill_dir = skill_path.parent
+        if skill_dir.name.startswith("troubleshoot-"):
+            validate_tier2_has_real_contexts(report, skill_dir)
+
     check_repo_wide_forbidden_token(report)
 
     for w in report.warnings:
@@ -353,6 +575,7 @@ def main() -> int:
 
     summary = (
         f"{len(skills)} skills checked, "
+        f"{len(rules)} rule files checked, "
         f"{len(report.errors)} errors, "
         f"{len(report.warnings)} warnings"
     )
