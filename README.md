@@ -91,8 +91,9 @@ See [`tests/e2e/README.md`](./tests/e2e/README.md) for how to reproduce the harn
 
 ## CI usage
 
-`.github/workflows/validate.yml` runs on every PR (static validation, link check).
-`.github/workflows/e2e.yml` runs on main-branch pushes and nightly (the full Docker-in-CI E2E).
+`.github/workflows/validate.yml` runs on every PR (static validation, link check). Validation covers every `SKILL.md` and every `rules/*.md` file, and enforces that Tier 2 troubleshooting skills cite real Netdata contexts from the matching collector's `metadata.yaml`.
+
+`.github/workflows/e2e.yml` runs on main-branch pushes and nightly (the full Docker-in-CI E2E). Both the Node.js and Python jobs run to completion; either failing blocks the pipeline.
 
 For a project-level PR review pattern using `claude -p` with this skill pack loaded, see [`docs/ci-recipes.md`](./docs/ci-recipes.md).
 
