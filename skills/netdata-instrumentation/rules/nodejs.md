@@ -73,7 +73,18 @@ default resource detector; there is no need to set them on the SDK in
 code.
 
 The gRPC exporter expects a bare `http://host:port` or `https://host:port`.
-Do not suffix `/v1/metrics`; that is the OTLP/HTTP path.
+
+**Incorrect** (suffixes an HTTP path onto a gRPC endpoint, connection fails silently or returns 404):
+
+```bash
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://netdata.example.internal:4317/v1/metrics
+```
+
+**Correct** (bare host:port for gRPC; `/v1/metrics` is the OTLP/HTTP path and belongs on a different exporter):
+
+```bash
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://netdata.example.internal:4317
+```
 
 ## Auto-instrumentation coverage
 

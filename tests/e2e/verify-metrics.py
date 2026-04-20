@@ -31,6 +31,12 @@ DEFAULT_APP_TARGETS = {
 
 MCP_CALL_TIMEOUT = 10.0
 
+NETDATA_CONTAINER = "netdata-skills-e2e"
+JOURNAL_DIR = "/var/log/netdata/otel/v1"
+DEFAULT_LOG_ANCHORS = {
+    "python": "hello-python request served",
+}
+
 
 def read_api_key() -> str:
     """Fetch the MCP bearer token from inside the running container."""
@@ -231,31 +237,124 @@ def try_rest_verification(netdata_url: str, service_name: str) -> tuple[bool, st
     )
 
 
+def try_journalctl_verification(service_name: str, anchor: str) -> tuple[bool, str]:
+    """Look for `anchor` in OTLP log bodies via journalctl.
+
+    Netdata's otel-plugin writes journal records with coded field names
+    (for example `NDAE_LOG_BODY` instead of `MESSAGE`, `ND3AE_RA_SERVICE_NAME`
+    instead of `SERVICE_NAME`). Using `-o export` and grepping the body
+    line is the portable way to find a specific record without knowing
+    the internal mapping.
+    """
+    cmd = [
+        "docker",
+        "exec",
+        NETDATA_CONTAINER,
+        "journalctl",
+        "-D",
+        JOURNAL_DIR,
+        "--since",
+        "10 minutes ago",
+        "--no-pager",
+        "--all",
+        "-o",
+        "export",
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, timeout=10)
+    except (subprocess.SubprocessError, OSError) as e:
+        return False, f"journalctl exec failed: {e}"
+
+    if result.returncode != 0:
+        stderr = result.stderr.decode("utf-8", "replace").strip().splitlines()
+        last = stderr[-1] if stderr else ""
+        return False, f"journalctl returned {result.returncode}: {last}"
+
+    stdout = result.stdout.decode("utf-8", "replace")
+    body_lines = [
+        line[len("NDAE_LOG_BODY="):]
+        for line in stdout.splitlines()
+        if line.startswith("NDAE_LOG_BODY=")
+    ]
+    service_lines = [
+        line[len("ND3AE_RA_SERVICE_NAME="):]
+        for line in stdout.splitlines()
+        if line.startswith("ND3AE_RA_SERVICE_NAME=")
+    ]
+    service_match = service_name in service_lines
+    anchor_match = any(anchor in body for body in body_lines)
+
+    if service_match and anchor_match:
+        return True, (
+            f"anchor '{anchor}' found in journal with service.name={service_name} "
+            f"({len(body_lines)} total bodies, {service_lines.count(service_name)} "
+            f"records for this service)"
+        )
+    return False, (
+        f"anchor '{anchor}' not found; journal has {len(body_lines)} bodies, "
+        f"{service_lines.count(service_name)} records with "
+        f"service.name={service_name} (service_match={service_match}, "
+        f"anchor_match={anchor_match})"
+    )
+
+
 def verify_with_retries(
     netdata_url: str,
     service_name: str,
+    signal: str,
+    log_anchor: str | None,
     attempts: int = 6,
     sleep_s: float = 5.0,
 ) -> int:
-    last_mcp = last_rest = ""
+    want_metrics = signal in ("metrics", "both")
+    want_logs = signal in ("logs", "both")
+    metrics_ok = not want_metrics
+    logs_ok = not want_logs
+    last_mcp = last_rest = last_log = ""
+
     for i in range(1, attempts + 1):
-        ok, mcp_msg = try_mcp_verification(netdata_url, service_name)
-        last_mcp = mcp_msg
-        if ok:
-            print(f"[verify] MCP PASS ({i}/{attempts}): {mcp_msg}")
+        if want_metrics and not metrics_ok:
+            ok, mcp_msg = try_mcp_verification(netdata_url, service_name)
+            last_mcp = mcp_msg
+            if ok:
+                print(f"[verify] metrics MCP PASS ({i}/{attempts}): {mcp_msg}")
+                metrics_ok = True
+            else:
+                print(f"[verify] metrics MCP attempt {i}/{attempts}: {mcp_msg}")
+                ok, rest_msg = try_rest_verification(netdata_url, service_name)
+                last_rest = rest_msg
+                if ok:
+                    print(f"[verify] metrics REST PASS ({i}/{attempts}): {rest_msg}")
+                    metrics_ok = True
+                else:
+                    print(f"[verify] metrics REST attempt {i}/{attempts}: {rest_msg}")
+
+        if want_logs and not logs_ok:
+            if not log_anchor:
+                return _fail("no log anchor configured for this app")
+            ok, log_msg = try_journalctl_verification(service_name, log_anchor)
+            last_log = log_msg
+            if ok:
+                print(f"[verify] logs PASS ({i}/{attempts}): {log_msg}")
+                logs_ok = True
+            else:
+                print(f"[verify] logs attempt {i}/{attempts}: {log_msg}")
+
+        if metrics_ok and logs_ok:
             return 0
-        print(f"[verify] MCP attempt {i}/{attempts}: {mcp_msg}")
-        ok, rest_msg = try_rest_verification(netdata_url, service_name)
-        last_rest = rest_msg
-        if ok:
-            print(f"[verify] REST PASS ({i}/{attempts}): {rest_msg}")
-            return 0
-        print(f"[verify] REST attempt {i}/{attempts}: {rest_msg}")
         time.sleep(sleep_s)
 
     print(f"[verify] FAIL after {attempts} attempts.")
-    print(f"[verify]   last MCP result:  {last_mcp}")
-    print(f"[verify]   last REST result: {last_rest}")
+    if want_metrics and not metrics_ok:
+        print(f"[verify]   last metrics MCP result:  {last_mcp}")
+        print(f"[verify]   last metrics REST result: {last_rest}")
+    if want_logs and not logs_ok:
+        print(f"[verify]   last logs result:         {last_log}")
+    return 1
+
+
+def _fail(msg: str) -> int:
+    print(f"[verify] FAIL: {msg}")
     return 1
 
 
@@ -264,11 +363,18 @@ def main() -> int:
     ap.add_argument("--app", default="nodejs", choices=sorted(DEFAULT_APP_TARGETS))
     ap.add_argument("--url", default=DEFAULT_NETDATA_URL)
     ap.add_argument("--service", default=None)
+    ap.add_argument("--signal", default="metrics", choices=["metrics", "logs", "both"])
+    ap.add_argument("--log-anchor", default=None,
+                    help="Substring to grep for in OTLP log records. "
+                         "Defaults per-app.")
     ap.add_argument("--attempts", type=int, default=6)
     args = ap.parse_args()
 
     service = args.service or DEFAULT_APP_TARGETS[args.app]
-    return verify_with_retries(args.url, service, attempts=args.attempts)
+    log_anchor = args.log_anchor or DEFAULT_LOG_ANCHORS.get(args.app)
+    return verify_with_retries(
+        args.url, service, args.signal, log_anchor, attempts=args.attempts
+    )
 
 
 if __name__ == "__main__":

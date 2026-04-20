@@ -1,3 +1,4 @@
+import logging
 import os
 
 import instrument  # noqa: F401  -- must import before Flask
@@ -5,12 +6,15 @@ import instrument  # noqa: F401  -- must import before Flask
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
 from flask import Flask, jsonify
 
+logger = logging.getLogger("hello-python")
+
 app = Flask(__name__)
 FlaskInstrumentor().instrument_app(app)
 
 
 @app.route("/hello")
 def hello():
+    logger.info("hello-python request served", extra={"route": "/hello"})
     return jsonify(ok=True)
 
 
