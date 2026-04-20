@@ -99,10 +99,27 @@ func main() {
 
 ## Note on endpoint format
 
-The Go gRPC exporter takes the endpoint without a scheme prefix
-(`localhost:4317`). Many SDKs accept both forms; Go's is strict. If you
-want to reuse the same `OTEL_EXPORTER_OTLP_ENDPOINT` value across
-languages, strip the scheme in Go:
+The Go gRPC exporter takes the endpoint without a scheme prefix. Many
+SDKs accept both forms; Go's is strict.
+
+**Incorrect** (Go gRPC rejects the scheme prefix; dial fails with a parse error):
+
+```go
+exporter, _ := otlpmetricgrpc.New(ctx,
+    otlpmetricgrpc.WithEndpoint("http://netdata.example.internal:4317"),
+)
+```
+
+**Correct** (bare `host:port`):
+
+```go
+exporter, _ := otlpmetricgrpc.New(ctx,
+    otlpmetricgrpc.WithEndpoint("netdata.example.internal:4317"),
+)
+```
+
+If you want to reuse the same `OTEL_EXPORTER_OTLP_ENDPOINT` value across
+languages, strip the scheme in Go at startup:
 
 ```go
 endpoint = strings.TrimPrefix(endpoint, "http://")

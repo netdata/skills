@@ -130,8 +130,14 @@ bash traffic.sh 30 "$APP_URL"
 echo "[e2e] waiting 15 seconds for batch export..."
 sleep 15
 
-echo "[e2e] verifying metrics arrived (local Agent MCP)..."
-python3 verify-metrics.py --app="$LANG_" --url="$NETDATA_URL"
+if [ "$LANG_" = "python" ]; then
+  VERIFY_SIGNAL=both
+else
+  VERIFY_SIGNAL=metrics
+fi
+
+echo "[e2e] verifying arrived (signal=$VERIFY_SIGNAL)..."
+python3 verify-metrics.py --app="$LANG_" --url="$NETDATA_URL" --signal="$VERIFY_SIGNAL"
 
 if [ "$MODE" = "cloud" ]; then
   SERVICE_NAME="hello-$LANG_"

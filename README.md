@@ -34,10 +34,11 @@ git clone git@github.com:netdata/skills.git ~/netdata-skills
 
 ```text
 /plugin marketplace add ~/netdata-skills
+/plugin marketplace update netdata-skills
 /plugin install netdata-skills@netdata-skills
 ```
 
-Local paths work identically to GitHub URLs for `/plugin marketplace add`. Pull the repo later to pick up changes; run `/plugin marketplace update netdata-skills` to refresh the index.
+Local paths work identically to GitHub URLs for `/plugin marketplace add`. The `update` step refreshes the marketplace index; it is required on first install for directory-source marketplaces, and also picks up later changes after `git pull`.
 
 ### Verify the install worked
 

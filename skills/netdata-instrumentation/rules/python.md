@@ -23,10 +23,15 @@ Save as `instrument.py`. Import it before the app imports anything else.
 
 ```python
 # instrument.py
+import logging
 import os
 
 from opentelemetry import metrics
+from opentelemetry._logs import set_logger_provider
+from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
+from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.resources import Resource
@@ -47,6 +52,16 @@ reader = PeriodicExportingMetricReader(
 )
 
 metrics.set_meter_provider(MeterProvider(resource=resource, metric_readers=[reader]))
+
+logger_provider = LoggerProvider(resource=resource)
+logger_provider.add_log_record_processor(
+    BatchLogRecordProcessor(OTLPLogExporter(endpoint=ENDPOINT, insecure=True))
+)
+set_logger_provider(logger_provider)
+
+handler = LoggingHandler(level=logging.INFO, logger_provider=logger_provider)
+logging.getLogger().addHandler(handler)
+logging.getLogger().setLevel(logging.INFO)
 ```
 
 Wire it in at process start:
@@ -77,13 +92,15 @@ from environment variables and patches supported libraries.
 opentelemetry-instrument \
   --metrics_exporter otlp \
   --traces_exporter none \
-  --logs_exporter none \
+  --logs_exporter otlp \
   python app.py
 ```
 
-`--traces_exporter none` and `--logs_exporter none` are important:
-Netdata does not yet accept traces, and the Python logs SDK is still
-experimental.
+`--traces_exporter none` is required: Netdata does not yet accept
+traces. `--logs_exporter otlp` wires the Python stdlib `logging`
+module to the OTLP logs pipeline, including a `LoggingHandler`
+attached to the root logger. No code change to the service is needed
+on this path.
 
 ## Required environment variables
 
@@ -95,8 +112,19 @@ export OTEL_EXPORTER_OTLP_ENDPOINT=http://netdata.example.internal:4317
 export OTEL_EXPORTER_OTLP_PROTOCOL=grpc
 export OTEL_METRICS_EXPORTER=otlp
 export OTEL_TRACES_EXPORTER=none
-export OTEL_LOGS_EXPORTER=none
+export OTEL_LOGS_EXPORTER=otlp
 ```
+
+## What Netdata does with OTLP logs
+
+OTLP/gRPC log ingestion is always on once `otel-plugin` is running.
+Ingested records are written to systemd-compatible journal files at
+`/var/log/netdata/otel/v1`. Inspect with
+`journalctl -D /var/log/netdata/otel/v1 SERVICE_NAME=<service>`.
+Resource attributes become journal fields with upper-case names.
+Rotation and retention knobs live under `logs:` in `otel.yaml`; stock
+defaults cap at 10 files totalling 1 GB over 7 days. Full reference:
+[`netdata-otel-setup/rules/log-ingestion.md`](../../netdata-otel-setup/rules/log-ingestion.md).
 
 ## Framework notes
 
