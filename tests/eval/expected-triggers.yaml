@@ -1,0 +1,59 @@
+# Expected trigger keywords per skill.
+#
+# Each skill lists words/phrases whose presence in a user prompt should
+# raise the probability that the skill's description field matches. This
+# file is not a test by itself; it is a hand-written crib sheet that a
+# future automated eval can use to audit the `description` field in each
+# SKILL.md.
+
+netdata-otel-setup:
+  - "otel.yaml"
+  - "otlp"
+  - "netdata receiver"
+  - "metric mapping"
+  - "4317"
+  - "opentelemetry plugin"
+  - "otel.d"
+
+netdata-instrumentation:
+  - "instrument"
+  - "sdk"
+  - "auto-instrumentation"
+  - "service.name"
+  - "node.js"
+  - "python"
+  - "opentelemetry"
+
+netdata-collector-config:
+  - "otel collector"
+  - "daemonset"
+  - "gateway"
+  - "receiver"
+  - "processor"
+  - "exporter"
+  - "kubernetes"
+
+netdata-mcp-integration:
+  - "mcp"
+  - "claude code"
+  - "cursor"
+  - "codex"
+  - "gemini"
+  - "verify telemetry"
+  - "nd-mcp"
+
+netdata-migration:
+  - "migrate"
+  - "datadog"
+  - "new relic"
+  - "dynatrace"
+  - "prometheus"
+  - "replace vendor"
+
+troubleshoot-postgresql:
+  - "postgres"
+  - "postgresql"
+  - "autovacuum"
+  - "wal"
+  - "wraparound"
+  - "replication lag"

@@ -1,0 +1,167 @@
+---
+name: troubleshoot-tomcat
+description: "Use when diagnosing issues with Apache Tomcat: thread pool exhaustion, heap exhaustion / gc death spiral, classloader leak on redeploy, stuck threads, or connection saturation. Queries Netdata via MCP for thread pool utilization, jvm process alive, request throughput, bytes sent/received rate, request processing time, applies the diagnostic tree from the Netdata operator playbook, and recommends remediation."
+version: 0.1.0
+author: Netdata
+license: Apache-2.0
+tags:
+  - netdata
+  - troubleshoot
+  - mcp
+  - tomcat
+---
+
+# Troubleshoot Apache Tomcat
+
+## When to use this skill
+
+- **Thread pool exhaustion**: the most common Tomcat failure. Slow backends, long-running requests,
+                              or connection storms consume all threads. Application appears "hung"
+                              even though JVM is healthy.
+- **Heap exhaustion / GC death spiral**: session accumulation or app memory leaks fill the heap. GC
+                                         runs more frequently then positive feedback loop then
+                                         `OutOfMemoryError` or livelock.
+- **Classloader leak on redeploy**: each hot redeploy leaks the previous webapp's classloader.
+                                    Metaspace grows monotonically. After N redeploys:
+                                    `OutOfMemoryError: Metaspace`.
+- **Stuck threads**: a thread blocks indefinitely on a backend call with no timeout. Permanently
+                     consumed.
+- **Connection saturation**: `maxConnections` reached (NIO poller full), then `acceptCount` queue
+                             fills. New TCP connections get RST.
+- **File descriptor exhaustion**: socket leaks, excessive logging, or low ulimit then
+                                  `SocketException: Too many open files`.
+- Any time the user reports a Apache Tomcat service behaving outside its expected envelope (elevated
+  errors, latency, saturation, resource exhaustion, or unexpected restarts).
+- An on-call engineer is paging on a Netdata alert tied to a Apache Tomcat instance and wants a
+  structured triage path.
+
+## Key facts
+
+- This skill wraps the Netdata operator playbook for Apache Tomcat. It does not replace the
+  playbook; it routes a coding agent through MCP queries against the same signals the playbook
+  relies on.
+- The playbook decomposes Apache Tomcat health into 6 signal domains: Availability, Throughput,
+  Latency, Errors, Saturation, Internal State. Each domain maps to one rule file in this skill.
+- Dominant failure archetypes the playbook calls out: Thread pool exhaustion; Heap exhaustion / GC
+  death spiral; Classloader leak on redeploy; Stuck threads; Connection saturation.
+- Netdata observes the signals listed in the rule files via its native collectors, plus any
+  OpenTelemetry-shipped metrics that your Apache Tomcat instrumentation adds. Both paths end at the
+  same MCP query surface.
+- Netdata's tomcat collector emits 7 context(s) under `tomcat.*`. The rule files enumerate which
+  contexts surface which domain; the Verification section below names the load-bearing ones
+  explicitly.
+
+## Step-by-step
+
+1. Confirm the Apache Tomcat service is up. Query Netdata via MCP with `list_nodes` and filter by
+   the host running the target. A missing node means the symptom is at the network or orchestrator
+   layer, not inside the service.
+2. Pull the last 15 minutes of signals for the target. Use `query_metrics` against the contexts
+   listed in the domain rule files. Run `find_anomalous_metrics` in parallel over the same window;
+   anomalies frame which rule file to read first.
+3. Check for **Thread pool exhaustion**. the most common Tomcat failure. Slow backends, long-running
+   requests, or connection storms consume all threads. Application appears "hung" even though JVM is
+   healthy. Inspect the rule file whose signals move first for this mode.
+4. Check for **Heap exhaustion / GC death spiral**. session accumulation or app memory leaks fill
+   the heap. GC runs more frequently then positive feedback loop then `OutOfMemoryError` or
+   livelock. Inspect the rule file whose signals move first for this mode.
+5. Check for **Classloader leak on redeploy**. each hot redeploy leaks the previous webapp's
+   classloader. Metaspace grows monotonically. After N redeploys: `OutOfMemoryError: Metaspace`.
+   Inspect the rule file whose signals move first for this mode.
+6. Check for **Stuck threads**. a thread blocks indefinitely on a backend call with no timeout.
+   Permanently consumed. Inspect the rule file whose signals move first for this mode.
+7. Check for **Connection saturation**. `maxConnections` reached (NIO poller full), then
+   `acceptCount` queue fills. New TCP connections get RST. Inspect the rule file whose signals move
+   first for this mode.
+8. Correlate with host-level signals (`system.cpu.utilization`, `system.memory.usage`,
+   `system.disk.io_time`). Many service-level failures have a host-resource precursor.
+9. Apply the remediation hinted at in the matching rule file or the operator playbook. Re-run the
+   MCP queries from the Verification section to confirm the signals returned to expected ranges. A
+   fix that does not move the signal back is not a fix.
+
+### Handy MCP call templates
+
+```text
+# Discover metrics from Apache Tomcat
+list_metrics with q="tomcat"
+
+# Pull a specific context over the last window
+query_metrics with context="tomcat.connector_errors", relative_window=-15m
+
+# Rank anomalies for the service or host
+find_anomalous_metrics with node=<host> and context_pattern="tomcat.*"
+
+# Correlate a known problem context with others
+find_correlated_metrics around the incident window
+
+# Show current alert state
+list_raised_alerts scoped to the node
+```
+
+## Common mistakes
+
+- Treating Apache Tomcat as a generic HTTP or process health check. Apache Tomcat has specific
+  failure archetypes (see Key facts) that generic checks miss.
+- Stopping at the first anomalous metric. Several archetypes produce correlated spikes; use
+  `find_correlated_metrics` to widen the search before concluding a root cause.
+- Quoting percentile latency without the sample count. Low traffic plus a single slow request moves
+  p99 by seconds.
+- Reading dashboards for a window shorter than the failure's fingerprint. Slow-brew failures (queue
+  growth, bloat, memory fragmentation) need 30+ minutes of data to see the trend.
+- Skipping the host-level correlation. A process-level fix for a noisy-neighbour problem does not
+  hold.
+- Assuming alert thresholds are tuned for your workload. Tune against observed Apache Tomcat traffic
+  before escalating an alert configuration issue.
+
+## Verification
+
+Run these MCP queries against the Netdata instance that sees the Apache Tomcat service. Every
+context listed below is a real Netdata chart name; the agent does not need to guess.
+
+```text
+1. list_metrics filtered by q="tomcat" (returns every tomcat.* context Netdata sees)
+2. query_metrics with contexts=[tomcat.connector_errors, tomcat.jvm_memory_usage, tomcat.connector_requests, tomcat.connector_requests_processing_time, tomcat.jvm_mem_pool_memory_usage, tomcat.connector_bandwidth] and relative_window=-30m
+3. find_anomalous_metrics filtered by node=<host> and context_pattern="tomcat.*"
+```
+
+Load-bearing contexts for this service:
+
+- `tomcat.connector_errors`: Connector Errors (errors/s). Dimensions: errors.
+- `tomcat.jvm_memory_usage`: Requests (bytes). Dimensions: free, used.
+- `tomcat.connector_requests`: Connector Requests (requests/s). Dimensions: requests.
+- `tomcat.connector_requests_processing_time`: Connector Requests Processing Time (milliseconds).
+                                               Dimensions: processing_time.
+- `tomcat.jvm_mem_pool_memory_usage`: JVM Mem Pool Memory Usage (bytes). Dimensions: commited, used,
+                                      max.
+- `tomcat.connector_bandwidth`: Connector Bandwidth (bytes/s). Dimensions: received, sent.
+
+A clean result means every context is within its expected band and the `find_anomalous_metrics` list
+is empty or contains only already-acknowledged items. If the fix was real, re-running the same
+queries 10 minutes after applying it will show a clean result. If it does not, revert and look
+deeper.
+
+### When the fix does not hold
+
+If signals drift back into the anomalous range within 30 minutes of a remediation, the cause was
+deeper than the applied change. Typical misdiagnoses for Apache Tomcat:
+
+- Host-resource pressure masquerading as application bug.
+- Dependent service (DB, cache, upstream) causing a secondary symptom in the instrumented service.
+- Configuration change that was never reloaded (some subsystems only pick up config on full
+  restart).
+
+Escalate by widening the query window: 2-6 hours instead of 15 minutes. Slow-moving causes are
+invisible at triage window sizes.
+
+## References
+
+- [`rules/availability.md`](./rules/availability.md)
+- [`rules/throughput.md`](./rules/throughput.md)
+- [`rules/latency.md`](./rules/latency.md)
+- [`rules/errors.md`](./rules/errors.md)
+- [`rules/saturation.md`](./rules/saturation.md)
+- [`rules/internal-state.md`](./rules/internal-state.md)
+- Netdata operator playbook: the authoritative source material this skill summarizes.
+- `skills/netdata-mcp-integration/` for the transport setup.
+- `skills/netdata-otel-setup/` if additional application signals are needed beyond what Netdata
+  collects natively.

@@ -1,0 +1,154 @@
+---
+name: netdata-instrumentation
+description: Use when adding OpenTelemetry instrumentation to application code that will report to Netdata. Covers SDK setup, resource attributes, auto-instrumentation, and patterns for Node.js, Python, Java, Go, .NET, Ruby, and PHP. Emits metrics and logs via OTLP gRPC to Netdata. Traces are not yet supported by Netdata; use an alternative trace backend until Q2 2026.
+version: 0.1.0
+author: Netdata
+license: Apache-2.0
+tags:
+  - netdata
+  - opentelemetry
+  - otel
+  - instrumentation
+  - sdk
+  - nodejs
+  - python
+  - java
+  - golang
+  - dotnet
+  - ruby
+  - php
+---
+
+# Netdata instrumentation
+
+This skill adds OpenTelemetry instrumentation to application code that
+will export metrics (and, where the SDK is mature enough, logs) to
+Netdata over OTLP/gRPC.
+
+## When to use this skill
+
+- The user is adding observability to a service for the first time.
+- The user wants to replace a vendor SDK (Datadog, New Relic, Dynatrace)
+  with OpenTelemetry.
+- The user is wiring auto-instrumentation into an existing service.
+- The user wants to know what resource attributes Netdata's dashboard
+  and MCP tools rely on.
+- The user is choosing between SDK-level and Collector-level exporting.
+
+## Key facts
+
+- Export protocol: OTLP/gRPC on the Netdata OTLP port (default 4317).
+- Signals: metrics and logs are accepted. Traces are not yet accepted by
+  Netdata (planned Q2 2026). If the service only needs traces, send them
+  to Jaeger, Tempo, or an external vendor; do not configure a trace
+  exporter pointed at Netdata.
+- Resource attributes that matter:
+  - `service.name` (required by OTel). Netdata groups charts by this.
+  - `service.version`. Used in dashboards and alert rules.
+  - `deployment.environment` (or `deployment.environment.name` in the
+    newer semconv). Lets the MCP tools filter by env.
+  - `host.name`. Filled by most SDKs automatically.
+- Prefer auto-instrumentation where it exists (Node.js, Python, Java,
+  .NET, Ruby). Hand-code only for Go and PHP, where auto-instrumentation
+  is immature or not yet stable.
+- Metrics default to delta temporality in many SDKs; Netdata accepts
+  both delta and cumulative. Pick cumulative for gauges and sums when
+  the backend will be swapped later.
+- Environment variables control the exporter without code changes:
+  - `OTEL_SERVICE_NAME`
+  - `OTEL_EXPORTER_OTLP_ENDPOINT` (scheme + host + port, e.g.
+    `http://netdata.example.internal:4317`)
+  - `OTEL_RESOURCE_ATTRIBUTES` (comma-separated key=value list)
+  - `OTEL_EXPORTER_OTLP_PROTOCOL=grpc` (be explicit; some SDKs default
+    to `http/protobuf`)
+
+## Step-by-step
+
+1. Pick the language rule that matches the service. See [References](#references).
+2. Install the OTel packages with the versions listed in that rule.
+3. Copy the minimal SDK init into the service's startup path. In
+   Node.js/Python this is typically a `-r`/`--import` preload; in Java
+   it is the Java agent jar; in Go/Ruby/.NET/PHP it is an in-process
+   call before the first work happens.
+4. Set the environment variables above. The endpoint must use `http://`
+   (or `https://` with TLS) and port 4317. Do not put `/v1/metrics` on
+   the URL; that is the OTLP/HTTP path and the gRPC exporter does not
+   want it.
+5. Deploy. Generate some traffic. Verify metrics arrived (see
+   [Verification](#verification)).
+6. If metrics render in Netdata with unhelpful dimension names, add a
+   mapping file. See `skills/netdata-otel-setup/rules/metric-mapping.md`.
+
+## Common mistakes
+
+- Using the HTTP exporter (`exporter-otlp-http`, port 4318) against
+  Netdata. Netdata accepts gRPC only.
+- Forgetting to set `service.name`. Without it, charts group under an
+  "unknown_service" bucket and look broken.
+- Setting both the SDK endpoint and the Collector endpoint to the same
+  Netdata URL. Pick one export path: SDK to Netdata, or SDK to
+  Collector to Netdata. Double export doubles the sample count.
+- Calling `shutdown()` in the wrong place. Async SDKs need a chance to
+  flush on SIGTERM; a blind `process.exit(0)` loses the last batch.
+- Enabling trace exporting against Netdata. The gRPC connection will
+  succeed but the traces are silently dropped.
+- Hardcoding the endpoint in source. Use the env var. Let ops move the
+  endpoint without a code change.
+
+## Choosing SDK export vs Collector export
+
+Two deployment shapes:
+
+- **SDK -> Netdata directly**: simplest. The SDK's OTLP gRPC
+  exporter opens a connection to Netdata. Fine for single-service
+  setups or dev environments. The downside is that every service
+  carries its own export config and retry logic.
+- **SDK -> Collector -> Netdata**: a local (DaemonSet or sidecar)
+  Collector intercepts the SDK's OTLP output, adds enrichment
+  (Kubernetes metadata, cluster name, etc.), and forwards to
+  Netdata. The SDK points at `http://localhost:4317` or
+  `http://$HOST_IP:4317`; the Collector handles the real
+  destination, TLS, and retries.
+
+Production-shape defaults:
+
+- Single-service or dev: SDK -> Netdata directly.
+- Kubernetes, multi-team: SDK -> DaemonSet Collector -> Netdata
+  Parent.
+- Long-lived serverless / Lambda: SDK -> Netdata directly; the
+  Collector lifecycle does not fit a request-scoped runtime.
+
+## Verification
+
+Run an MCP query against the Netdata instance that is supposed to be
+receiving the traffic. See the MCP integration skill for the full
+transport setup; here is the minimum check:
+
+```bash
+# From a shell where the agent with MCP access is configured:
+# list_metrics filtered by service name
+```
+
+Or via the HTTP API for a quick check without an MCP client:
+
+```bash
+curl -s 'http://NETDATA_HOST:19999/api/v2/contexts' \
+  | jq --arg svc "$OTEL_SERVICE_NAME" \
+       '.contexts | to_entries[] | select(.key | contains($svc))'
+```
+
+A non-empty result means at least one metric from the service arrived
+within the last few minutes. For the canonical working instrumentation,
+see [`tests/e2e/sample-apps/`](../../tests/e2e/sample-apps/) in this repo.
+
+## References
+
+- [`rules/nodejs.md`](./rules/nodejs.md)
+- [`rules/python.md`](./rules/python.md)
+- [`rules/java.md`](./rules/java.md)
+- [`rules/go.md`](./rules/go.md)
+- [`rules/dotnet.md`](./rules/dotnet.md)
+- [`rules/ruby.md`](./rules/ruby.md)
+- [`rules/php.md`](./rules/php.md)
+- OpenTelemetry semconv: https://opentelemetry.io/docs/specs/semconv/
+- Netdata OTel integration: https://learn.netdata.cloud/docs/collecting-metrics/opentelemetry/opentelemetry-metrics

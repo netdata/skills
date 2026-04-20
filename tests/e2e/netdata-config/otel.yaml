@@ -1,0 +1,8 @@
+endpoint:
+  path: "0.0.0.0:4317"
+
+metrics:
+  interval_secs: 5
+  grace_period_secs: 30
+  expiry_duration_secs: 600
+  max_new_charts_per_request: 200

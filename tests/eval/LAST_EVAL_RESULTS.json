@@ -1,0 +1,198 @@
+[
+  {
+    "prompt": "Set up Netdata to receive OTLP metrics from my services.",
+    "expected": "netdata-otel-setup",
+    "picked": "netdata-otel-setup",
+    "match": true,
+    "reasoning": "Description explicitly covers enabling Netdata otel.plugin and OTLP gRPC ingestion for metrics."
+  },
+  {
+    "prompt": "I'm editing /etc/netdata/otel.yaml and need the right format for a metric mapping.",
+    "expected": "netdata-otel-setup",
+    "picked": "netdata-otel-setup",
+    "match": true,
+    "reasoning": "Description names /etc/netdata/otel.yaml and defining metric-to-chart mappings."
+  },
+  {
+    "prompt": "My OTel client can't connect to Netdata on port 4317. What am I missing?",
+    "expected": "netdata-otel-setup",
+    "picked": "netdata-otel-setup",
+    "match": true,
+    "reasoning": "Description covers debugging OTLP ingestion issues with Netdata."
+  },
+  {
+    "prompt": "How do I enable TLS on Netdata's OTLP receiver with client cert auth?",
+    "expected": "netdata-otel-setup",
+    "picked": "netdata-otel-setup",
+    "match": true,
+    "reasoning": "Description explicitly mentions configuring TLS on the OTLP receiver."
+  },
+  {
+    "prompt": "Where are OTel logs stored after Netdata ingests them?",
+    "expected": "netdata-otel-setup",
+    "picked": "netdata-otel-setup",
+    "match": true,
+    "reasoning": "Description covers OTLP logs ingestion in Netdata (v2.9.0+). Closest match for post-ingestion log storage question."
+  },
+  {
+    "prompt": "Add OpenTelemetry to my Node.js Express app and send it to Netdata.",
+    "expected": "netdata-instrumentation",
+    "picked": "netdata-instrumentation",
+    "match": true,
+    "reasoning": "Description covers adding OTel instrumentation to application code, specifically lists Node.js."
+  },
+  {
+    "prompt": "Instrument a Python Flask service so its metrics land in Netdata.",
+    "expected": "netdata-instrumentation",
+    "picked": "netdata-instrumentation",
+    "match": true,
+    "reasoning": "Description lists Python among supported instrumentation languages."
+  },
+  {
+    "prompt": "I need OTel for a Java Spring Boot app; Netdata is the backend.",
+    "expected": "netdata-instrumentation",
+    "picked": "netdata-instrumentation",
+    "match": true,
+    "reasoning": "Description lists Java among supported languages for instrumentation."
+  },
+  {
+    "prompt": "What's the minimal SDK init for a Go service sending metrics to Netdata?",
+    "expected": "netdata-instrumentation",
+    "picked": "netdata-instrumentation",
+    "match": true,
+    "reasoning": "Description covers SDK setup and lists Go among languages."
+  },
+  {
+    "prompt": "Which resource attributes does Netdata care about?",
+    "expected": "netdata-instrumentation",
+    "picked": "netdata-instrumentation",
+    "match": true,
+    "reasoning": "Description explicitly mentions resource attributes as a covered topic."
+  },
+  {
+    "prompt": "Deploy an OTel Collector on Kubernetes that forwards everything to Netdata.",
+    "expected": "netdata-collector-config",
+    "picked": "netdata-collector-config",
+    "match": true,
+    "reasoning": "Description covers OTel Collector pipelines forwarding to Netdata, including DaemonSet deployment pattern."
+  },
+  {
+    "prompt": "I need a gateway Collector that aggregates OTLP from 50 services and hands it to Netdata.",
+    "expected": "netdata-collector-config",
+    "picked": "netdata-collector-config",
+    "match": true,
+    "reasoning": "Description explicitly names the gateway deployment pattern."
+  },
+  {
+    "prompt": "Use the OpenTelemetry Operator to manage the Collector.",
+    "expected": "netdata-collector-config",
+    "picked": "netdata-collector-config",
+    "match": true,
+    "reasoning": "Description explicitly names the OpenTelemetry Operator pattern."
+  },
+  {
+    "prompt": "Which Collector processors should a Netdata-bound pipeline have?",
+    "expected": "netdata-collector-config",
+    "picked": "netdata-collector-config",
+    "match": true,
+    "reasoning": "Description covers receivers, processors, and exporters for Netdata-bound pipelines."
+  },
+  {
+    "prompt": "Wire Claude Code to my Netdata Parent node via MCP.",
+    "expected": "netdata-mcp-integration",
+    "picked": "netdata-mcp-integration",
+    "match": true,
+    "reasoning": "Description names Claude Code connecting to a Netdata Parent via MCP."
+  },
+  {
+    "prompt": "How do I connect Cursor to Netdata so the agent can see my metrics?",
+    "expected": "netdata-mcp-integration",
+    "picked": "netdata-mcp-integration",
+    "match": true,
+    "reasoning": "Description lists Cursor as a supported MCP client."
+  },
+  {
+    "prompt": "I just added instrumentation; how do I verify the metrics arrived without opening the dashboard?",
+    "expected": "netdata-mcp-integration",
+    "picked": "netdata-mcp-integration",
+    "match": true,
+    "reasoning": "Description explicitly mentions verifying telemetry and cross-referencing instrumentation via MCP."
+  },
+  {
+    "prompt": "What MCP tools does Netdata expose?",
+    "expected": "netdata-mcp-integration",
+    "picked": "netdata-mcp-integration",
+    "match": true,
+    "reasoning": "Only skill addressing Netdata's MCP surface."
+  },
+  {
+    "prompt": "We're moving off Datadog to Netdata. What changes in the app code?",
+    "expected": "netdata-migration",
+    "picked": "netdata-migration",
+    "match": true,
+    "reasoning": "Description names Datadog migration and SDK replacement."
+  },
+  {
+    "prompt": "Migrate from New Relic to Netdata.",
+    "expected": "netdata-migration",
+    "picked": "netdata-migration",
+    "match": true,
+    "reasoning": "Description explicitly lists New Relic as a supported migration source."
+  },
+  {
+    "prompt": "We have Prometheus scraping today; how do we route that through Netdata?",
+    "expected": "netdata-migration",
+    "picked": "netdata-migration",
+    "match": true,
+    "reasoning": "Description names Prometheus endpoint passthrough."
+  },
+  {
+    "prompt": "Should I expect dashboard parity between Dynatrace and Netdata?",
+    "expected": "netdata-migration",
+    "picked": "netdata-migration",
+    "match": true,
+    "reasoning": "Description names Dynatrace and dashboard parity expectations."
+  },
+  {
+    "prompt": "Postgres connections are maxing out. Help me diagnose.",
+    "expected": "troubleshoot-postgresql",
+    "picked": "troubleshoot-postgresql",
+    "match": true,
+    "reasoning": "Description explicitly lists 'connection exhaustion' as a covered failure mode."
+  },
+  {
+    "prompt": "My PostgreSQL replica is lagging badly.",
+    "expected": "troubleshoot-postgresql",
+    "picked": "troubleshoot-postgresql",
+    "match": true,
+    "reasoning": "Description covers PostgreSQL with recovery state signals; closest match for replica lag."
+  },
+  {
+    "prompt": "Nginx is returning 502s, upstream seems fine. What's going on?",
+    "expected": "troubleshoot-nginx",
+    "picked": "troubleshoot-nginx",
+    "match": true,
+    "reasoning": "Description covers nginx backend cascade failure and connection exhaustion."
+  },
+  {
+    "prompt": "Redis latency just spiked; fork happened a minute ago. Related?",
+    "expected": "troubleshoot-redis",
+    "picked": "troubleshoot-redis",
+    "match": true,
+    "reasoning": "Description explicitly lists 'the fork/cow storm' as a covered failure mode."
+  },
+  {
+    "prompt": "Kafka consumer lag keeps growing despite low producer throughput.",
+    "expected": "troubleshoot-kafka",
+    "picked": "troubleshoot-kafka",
+    "match": true,
+    "reasoning": "Description explicitly mentions 'the consumer falls behind' as a failure mode."
+  },
+  {
+    "prompt": "MySQL replication broke with a GTID mismatch.",
+    "expected": "troubleshoot-mysql",
+    "picked": "troubleshoot-mysql",
+    "match": true,
+    "reasoning": "Description covers MySQL replication lag spiral; closest match for replication issues."
+  }
+]
