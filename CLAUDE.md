@@ -22,6 +22,10 @@ Tier 1 (foundational):
   live telemetry verification and query.
 - [`skills/netdata-migration/`](./skills/netdata-migration/): migrate from
   Datadog, New Relic, Dynatrace, or Prometheus to Netdata.
+- [`skills/netdata-config-from-requirements/`](./skills/netdata-config-from-requirements/):
+  produce a ready-to-hand-off config bundle (otel.yaml, Collector pipeline,
+  per-language handoff, verification runbook, open questions) from a customer
+  requirements document. Used when no code access is available.
 
 Tier 2 (technology-specific troubleshooting, generated from the Netdata
 operator playbooks):
