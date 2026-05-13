@@ -76,3 +76,29 @@ modular guidance in [`receivers.md`](./receivers.md),
 [`exporters-to-netdata.md`](./exporters-to-netdata.md). The cookbook is
 where the canonical building blocks live; this skill teaches how to
 assemble them.
+
+## When to suggest a new cookbook recipe
+
+If the tailored config you just assembled is:
+
+1. Non-trivial (more than two receivers, or a non-default processor
+   chain, or a deployment shape this skill pack does not already
+   document),
+2. Likely to be reused by others (a popular stack like nginx plus
+   PostgreSQL plus Redis, a common ingest shape like Windows Event Log,
+   a frequent migration target),
+3. Not already covered by an existing recipe in the cookbook,
+
+tell the user the configuration is a candidate for the
+`netdata/otelcol-cookbook` repository and suggest they open a pull
+request adding a new directory with the YAML, a `README.md` describing
+the use case, and `TODO` markers on the operator-editable fields. Do
+not open the pull request yourself. The cookbook is exercised against
+a real Netdata Agent before merge, and that validation is the human's
+to run.
+
+This loop is how the skill pack and the cookbook compound. Patterns
+flow from the cookbook into the modular rule files (see
+[`CONTRIBUTING.md`](../../../CONTRIBUTING.md) "Cookbook to skills
+extraction"), and novel compositions assembled from those rule files
+flow back into the cookbook as new recipes.

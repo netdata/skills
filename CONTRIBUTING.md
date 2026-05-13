@@ -12,7 +12,18 @@ Three rules cover 90% of contributions:
 - **New skills**: propose via a Skill Request issue first ([`.github/ISSUE_TEMPLATE/skill-request.md`](./.github/ISSUE_TEMPLATE/skill-request.md)). Reviewers need to see the agent-facing scenario the skill solves before the content review.
 - **Playbook-derived skills**: the Tier 2 skills are generated from the Netdata operator playbooks. If a playbook is updated, re-run `python scripts/generate-troubleshoot-skills.py` and commit the regenerated files.
 - **E2E coverage**: add a language to `tests/e2e/sample-apps/` and extend `tests/e2e/run-e2e.sh`. See [`docs/e2e-testing.md`](./docs/e2e-testing.md).
-- **Cookbook patterns**: the [`netdata/otelcol-cookbook`](https://github.com/netdata/otelcol-cookbook) is the source of truth for end-to-end Collector recipes. `skills/netdata-collector-config/rules/recipes.md` instructs the agent to fetch the recipe list live; no local index is maintained. If a new cookbook recipe introduces a reusable building block, fold it into `receivers.md`, `processors.md`, or `exporters-to-netdata.md` here.
+- **Cookbook patterns**: the [`netdata/otelcol-cookbook`](https://github.com/netdata/otelcol-cookbook) is the source of truth for end-to-end Collector recipes. `skills/netdata-collector-config/rules/recipes.md` instructs the agent to fetch the recipe list live; no local index is maintained. When a new cookbook recipe lands upstream, extract its reusable patterns into the modular rule files. See "Cookbook to skills extraction" below.
+
+## Cookbook to skills extraction
+
+The cookbook is the canonical exercised version of each end-to-end Collector config. The skill pack's job is to extract the reusable building blocks so the agent can assemble configurations the cookbook does not cover. When a new cookbook recipe is published:
+
+- A new **receiver type or receiver-side trick** (network listener, RFC variant, port convention, attribute-attachment behavior) goes into `skills/netdata-collector-config/rules/receivers.md`.
+- A new **OTTL transform or processor idiom** (error handling mode, attribute promotion, schema evolution, semantic-convention migration, conditional drops) goes into `skills/netdata-collector-config/rules/processors.md`.
+- A new **exporter trick or extension** (durable queue via `file_storage`, retry shape, TLS wrinkle, sending-queue tuning) goes into `skills/netdata-collector-config/rules/exporters-to-netdata.md`.
+- A new **deployment shape** (sidecar, hybrid DaemonSet plus gateway, host-network requirements) goes into a new or existing `skills/netdata-collector-config/rules/*-deployment.md`.
+
+Every extracted block must cite the recipe it came from with a link to `https://github.com/netdata/otelcol-cookbook/tree/master/<recipe>`. Do not copy the recipe's full `otelcol.yaml` into a rule file; the rule file teaches the pattern, the cookbook holds the exercised configuration.
 
 ## Writing a skill
 

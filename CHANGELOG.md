@@ -27,6 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `rules/exporters-to-netdata.md`: a `file_storage` extension recipe
     for durable exporter sending queues that survive Collector
     restarts.
+- Cookbook / skills feedback loop documented in both directions.
+  `CONTRIBUTING.md` gains a "Cookbook to skills extraction" section
+  listing where each kind of cookbook pattern (receiver, processor,
+  exporter, deployment) folds into the modular rule files.
+  `rules/recipes.md` gains a "When to suggest a new cookbook recipe"
+  section so the agent tells the user to upstream non-trivial,
+  reusable compositions it assembled from the modular rules.
 - `tests/e2e/verify-metrics-cloud.py` and a `cloud` mode in
   `run-e2e.sh` that claim the local Agent into a Netdata Cloud
   space and probe visibility via the Cloud MCP endpoint
