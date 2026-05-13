@@ -12,7 +12,7 @@ Three rules cover 90% of contributions:
 - **New skills**: propose via a Skill Request issue first ([`.github/ISSUE_TEMPLATE/skill-request.md`](./.github/ISSUE_TEMPLATE/skill-request.md)). Reviewers need to see the agent-facing scenario the skill solves before the content review.
 - **Playbook-derived skills**: the Tier 2 skills are generated from the Netdata operator playbooks. If a playbook is updated, re-run `python scripts/generate-troubleshoot-skills.py` and commit the regenerated files.
 - **E2E coverage**: add a language to `tests/e2e/sample-apps/` and extend `tests/e2e/run-e2e.sh`. See [`docs/e2e-testing.md`](./docs/e2e-testing.md).
-- **Cookbook drift**: run `python scripts/sync-cookbook.py` after a release of [`netdata/otelcol-cookbook`](https://github.com/netdata/otelcol-cookbook). If a new recipe appears upstream, add a row to `skills/netdata-collector-config/rules/recipes.md` (and fold any reusable building blocks into `receivers.md`, `processors.md`, or `exporters-to-netdata.md`). If a recipe disappears, retire the local entry.
+- **Cookbook patterns**: the [`netdata/otelcol-cookbook`](https://github.com/netdata/otelcol-cookbook) is the source of truth for end-to-end Collector recipes. `skills/netdata-collector-config/rules/recipes.md` instructs the agent to fetch the recipe list live; no local index is maintained. If a new cookbook recipe introduces a reusable building block, fold it into `receivers.md`, `processors.md`, or `exporters-to-netdata.md` here.
 
 ## Writing a skill
 
@@ -38,10 +38,6 @@ python scripts/validate.py
 
 # Install smoke test
 bash scripts/test-install.sh
-
-# Check the cookbook recipe index for drift (uses gh CLI auth or
-# GH_TOKEN / GITHUB_TOKEN env var; cookbook is currently private).
-python scripts/sync-cookbook.py
 
 # Full E2E (requires Docker, Node.js, Python)
 bash tests/e2e/run-e2e.sh nodejs

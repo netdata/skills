@@ -2,13 +2,37 @@
 
 The [`netdata/otelcol-cookbook`](https://github.com/netdata/otelcol-cookbook)
 repository is the source of truth for end-to-end OpenTelemetry Collector
-configurations that target Netdata. Recipes there have been exercised
-against a real Netdata Agent and ship complete `otelcol.yaml` files with
-inline `TODO` markers where the operator must edit.
+configurations that target Netdata. Each top-level directory is one recipe
+and ships a complete `otelcol.yaml` plus a `README.md` explaining the use
+case and the `TODO` markers an operator must edit.
 
-When the user asks for a pattern this index lists, fetch the recipe
-straight from the cookbook. Do not reconstruct cookbook content here.
-The cookbook is updated independently of this skill pack.
+This file does not maintain a local index of recipes. Look the cookbook up
+live when the user asks for one. The upstream list changes independently
+of this skill pack and any cached copy would drift.
+
+## How to find the right recipe
+
+1. Fetch the cookbook root README to see the recipe list and what each
+   one covers:
+
+   ```text
+   https://raw.githubusercontent.com/netdata/otelcol-cookbook/master/README.md
+   ```
+
+2. If the README does not name a recipe that matches, list the repo's
+   top-level directories. Every directory that contains an `otelcol.yaml`
+   is a recipe:
+
+   ```text
+   https://api.github.com/repos/netdata/otelcol-cookbook/contents
+   ```
+
+3. Read the matching recipe's own README before its YAML:
+
+   ```text
+   https://raw.githubusercontent.com/netdata/otelcol-cookbook/master/<recipe>/README.md
+   https://raw.githubusercontent.com/netdata/otelcol-cookbook/master/<recipe>/otelcol.yaml
+   ```
 
 ## Conventions every recipe uses
 
@@ -28,27 +52,16 @@ The cookbook is updated independently of this skill pack.
   [`exporters-to-netdata.md`](./exporters-to-netdata.md) for the same
   pattern documented here.
 
-## Index
-
-- [`syslog-ingest/`][syslog-ingest]: receive RFC 3164 / RFC 5424
-  syslog from network devices over UDP, normalize to OpenTelemetry
-  semantic conventions, forward to Netdata as OTLP logs.
-
 [collector-releases]: https://github.com/open-telemetry/opentelemetry-collector-releases
-[syslog-ingest]: https://github.com/netdata/otelcol-cookbook/tree/master/syslog-ingest
-
-If the user describes a workflow that is not in the index above, check
-the cookbook README directly before authoring new config: the index in
-this file is refreshed by `scripts/sync-cookbook.py` and may lag the
-upstream repo between syncs.
 
 ## How to apply a cookbook recipe
 
-1. Identify the recipe directory (for example `syslog-ingest/`).
+1. Identify the recipe directory by reading the cookbook README (step 1
+   above).
 2. Read the recipe `README.md` end to end. Each `TODO` marker in the
    YAML file corresponds to a decision the operator must make
    (timezone, protocol variant, exporter endpoint).
-3. Copy the YAML file into the host that will run the Collector.
+3. Copy the YAML file onto the host that will run the Collector.
 4. Edit every `TODO` line.
 5. Start the Collector: `otelcol-contrib --config ./otelcol.yaml`.
 6. Verify telemetry arrives at Netdata via the MCP integration skill.

@@ -166,8 +166,9 @@ a `README.md` explaining the use case and any required edits.
 
 When the cookbook covers a pattern the user is asking for, fetch the
 recipe directly from the source of truth rather than reconstructing it
-here. See [`rules/recipes.md`](./rules/recipes.md) for the current index
-and the conventions each recipe follows.
+here. See [`rules/recipes.md`](./rules/recipes.md) for how to look up
+the current recipe list at the moment of use and the conventions each
+recipe follows.
 
 ## References
 

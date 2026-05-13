@@ -11,10 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `netdata-collector-config` now references the
   [`netdata/otelcol-cookbook`](https://github.com/netdata/otelcol-cookbook)
-  repo as the source of truth for end-to-end Collector recipes. New
-  `rules/recipes.md` indexes the cookbook recipes and documents the
-  conventions each one follows. The cookbook's first recipe
-  (`syslog-ingest`) prompted additions to:
+  repo as the source of truth for end-to-end Collector recipes.
+  `rules/recipes.md` instructs the agent to fetch the cookbook recipe
+  list live (no static local index) and documents the conventions
+  every recipe follows. The cookbook's first recipe (`syslog-ingest`)
+  prompted additions to:
   - `rules/receivers.md`: a `syslog` receiver section covering UDP /
     TCP listeners, RFC 3164 vs RFC 5424, the `location` (timezone)
     field, and the non-privileged-port convention the cookbook uses.
@@ -26,10 +27,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `rules/exporters-to-netdata.md`: a `file_storage` extension recipe
     for durable exporter sending queues that survive Collector
     restarts.
-- `scripts/sync-cookbook.py` reports drift between
-  `rules/recipes.md` and the upstream cookbook. Honors `gh auth token`
-  or `GH_TOKEN` / `GITHUB_TOKEN` for the private repo. Emits JSON with
-  `--json` for CI integration.
 - `tests/e2e/verify-metrics-cloud.py` and a `cloud` mode in
   `run-e2e.sh` that claim the local Agent into a Netdata Cloud
   space and probe visibility via the Cloud MCP endpoint
