@@ -111,6 +111,43 @@ Emits cluster-wide metrics: node conditions, pod phases, HPA
 state, etc. Do not run this as a DaemonSet; the cluster API server
 will be hammered N times over.
 
+## syslog (network devices and RFC 3164 / RFC 5424 sources)
+
+Listen for syslog over UDP or TCP and convert each datagram to an OTLP
+log record. The canonical end-to-end form lives in the
+[`syslog-ingest`](https://github.com/netdata/otelcol-cookbook/tree/master/syslog-ingest)
+cookbook recipe; the snippet below is the minimal receiver block.
+
+```yaml
+receivers:
+  syslog:
+    location: "Europe/Athens"  # TODO: timezone for RFC 3164 timestamps
+    udp:
+      listen_address: "0.0.0.0:53514"
+      add_attributes: true
+    protocol: rfc3164  # or rfc5424
+```
+
+Key points:
+
+- The receiver does not auto-detect the protocol variant. Set
+  `protocol: rfc3164` for BSD syslog (the common default) or
+  `rfc5424` for the structured RFC 5424 form.
+- RFC 3164 timestamps have no timezone or year. `location` is the IANA
+  zone used to interpret them. Set this explicitly; the default is
+  UTC, which is rarely what the sending device meant.
+- Port 514 (UDP) and 601 (TCP) are the IANA-assigned syslog ports but
+  both require root. The cookbook uses 53514 because non-root
+  Collectors cannot bind below 1024 without `CAP_NET_BIND_SERVICE`.
+- `add_attributes: true` attaches the underlying network 5-tuple
+  (`net.peer.ip`, `net.host.port`, `net.transport`, etc.) to each log
+  record. Pair with the OTTL transform pattern in
+  [`processors.md`](./processors.md) to rename these to current OTel
+  semantic conventions (`client.address`, `server.port`,
+  `network.transport`).
+- Use `tcp:` instead of `udp:` for TLS or guaranteed delivery. Most
+  network devices only emit UDP.
+
 ## prometheus (scrape Prometheus endpoints)
 
 Most Kubernetes infrastructure (kube-state-metrics, node-exporter,
@@ -138,3 +175,4 @@ samples to OTLP metrics before they hit the pipeline.
 | DaemonSet | `otlp`, `hostmetrics`, `filelog`, `kubeletstats` |
 | Gateway | `otlp` only (producers push to it) |
 | Cluster Deployment | `k8s_cluster`, optionally `prometheus` |
+| Edge ingestor | `syslog`, `tcp_log`, `udp_log` (network devices) |

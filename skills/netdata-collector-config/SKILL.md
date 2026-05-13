@@ -157,6 +157,18 @@ that number is rising but Netdata is not seeing them, the
 problem is on the Netdata receiver side; run the otel-setup
 troubleshooting ladder.
 
+## Recipes
+
+For end-to-end Collector configurations tested against Netdata, consult
+the [Netdata OpenTelemetry Collector Cookbook](https://github.com/netdata/otelcol-cookbook).
+Each recipe directory in that repo ships a complete `otelcol.yaml` plus
+a `README.md` explaining the use case and any required edits.
+
+When the cookbook covers a pattern the user is asking for, fetch the
+recipe directly from the source of truth rather than reconstructing it
+here. See [`rules/recipes.md`](./rules/recipes.md) for the current index
+and the conventions each recipe follows.
+
 ## References
 
 - [`rules/receivers.md`](./rules/receivers.md)
@@ -165,5 +177,7 @@ troubleshooting ladder.
 - [`rules/daemonset-deployment.md`](./rules/daemonset-deployment.md)
 - [`rules/gateway-deployment.md`](./rules/gateway-deployment.md)
 - [`rules/otel-operator.md`](./rules/otel-operator.md)
+- [`rules/recipes.md`](./rules/recipes.md)
 - OTel Collector docs: https://opentelemetry.io/docs/collector/
 - OTel Operator: https://github.com/open-telemetry/opentelemetry-operator
+- Netdata OTel Collector Cookbook: https://github.com/netdata/otelcol-cookbook

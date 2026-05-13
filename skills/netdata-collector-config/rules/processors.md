@@ -92,14 +92,71 @@ names, move attributes, or drop records conditionally:
 ```yaml
 processors:
   transform/metric_renames:
+    error_mode: ignore
     metric_statements:
       - context: metric
         statements:
           - set(name, "http.server.duration") where name == "http.server.request.duration"
 ```
 
+Set `error_mode: ignore` on any transform that runs against
+heterogeneous input. The default error mode (`propagate`) drops the
+whole batch on a single failing statement; `ignore` skips only the
+failing record. Use `silent` when you also want to suppress the log
+line each failure emits.
+
 Prefer OTTL over custom processors; the config is text-reviewable
 and version-stable.
+
+### Promoting log attributes to resource attributes
+
+Receivers such as `syslog`, `udp_log`, and `filelog` place every
+parsed field under `log.attributes`. Netdata uses resource attributes
+to group records by service or host, so identity fields belong on the
+resource. The cookbook's
+[`syslog-ingest`](https://github.com/netdata/otelcol-cookbook/tree/master/syslog-ingest)
+recipe demonstrates the pattern:
+
+```yaml
+processors:
+  transform/syslog:
+    error_mode: ignore
+    log_statements:
+      - set(resource.attributes["host.name"], log.attributes["hostname"])
+      - delete_key(log.attributes, "hostname")
+      - set(resource.attributes["process.pid"], log.attributes["proc_id"])
+        where log.attributes["proc_id"] != nil
+      - delete_key(log.attributes, "proc_id")
+      - set(log.attributes["log.record.original"], log.body)
+      - set(log.body, log.attributes["message"])
+      - delete_key(log.attributes, "message")
+```
+
+The `set` then `delete_key` pair moves a field. Guarding the move with
+`where ... != nil` skips records that lack the field rather than
+emitting a null attribute. Preserve the unparsed datagram in
+`log.record.original` before overwriting `log.body`; downstream tools
+that need the raw form still have it.
+
+### Migrating to current OTel semantic conventions
+
+The `net.*` attribute namespace was renamed during the
+OpenTelemetry semconv stabilization. Receivers that emit the old
+names (`net.peer.ip`, `net.host.port`, `net.transport`) need a
+translation step so Netdata sees the current names. The cookbook's
+`syslog-ingest` recipe carries the full block; the shape is:
+
+```yaml
+- set(log.attributes["client.address"], log.attributes["net.peer.ip"])
+  where log.attributes["net.peer.ip"] != nil
+- delete_key(log.attributes, "net.peer.ip")
+- set(log.attributes["server.port"], Int(log.attributes["net.host.port"]))
+  where log.attributes["net.host.port"] != nil
+- delete_key(log.attributes, "net.host.port")
+```
+
+Cast strings to integers with `Int(...)` so port and PID attributes
+land as numeric types rather than as quoted strings.
 
 ## filter (drop what you do not need)
 

@@ -88,6 +88,53 @@ service:
 Both Netdatas receive every sample. Use this sparingly; it
 doubles upstream load.
 
+## Durable sending queue (`file_storage` extension)
+
+The default `sending_queue` lives in memory. A Collector restart loses
+whatever the queue held. For pipelines where in-flight data must
+survive restarts (typically log ingestion from devices that do not
+retransmit), back the queue with the `file_storage` extension. This is
+the pattern the
+[`syslog-ingest`](https://github.com/netdata/otelcol-cookbook/tree/master/syslog-ingest)
+cookbook recipe uses in its durable variant.
+
+```yaml
+extensions:
+  file_storage/otlp_sending_queue:
+    directory: /var/lib/otelcol/filestorage/otlp_sending_queue
+    create_directory: true
+
+exporters:
+  otlp/netdata:
+    endpoint: netdata.example.internal:4317
+    tls:
+      insecure: true
+    sending_queue:
+      storage: file_storage/otlp_sending_queue
+
+service:
+  extensions:
+    - file_storage/otlp_sending_queue
+  pipelines:
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp/netdata]
+```
+
+Key points:
+
+- The extension must be listed under `service.extensions` for the
+  Collector to load it. The exporter reference alone is not enough.
+- The `directory` path must be writable by the user the Collector runs
+  as. The cookbook uses `/tmp/...` for demos; production deployments
+  should pick a persistent location such as `/var/lib/otelcol/...`.
+- One `file_storage` extension can back several exporters by name.
+  Each exporter gets its own subdirectory automatically.
+- Disk-backed queues protect against Collector restarts and short
+  Netdata outages. They do not protect against disk loss; pair with
+  the appropriate filesystem durability for the host.
+
 ## What `sending_queue` sizes to pick
 
 A single Collector with the defaults above (5000 queue size,
