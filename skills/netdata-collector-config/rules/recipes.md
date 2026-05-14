@@ -12,22 +12,18 @@ of this skill pack and any cached copy would drift.
 
 ## How to find the right recipe
 
-1. Fetch the cookbook root README to see the recipe list and what each
-   one covers:
+The cookbook root README does not list recipes. List the repo's
+top-level directories to discover what is available. Every directory
+that contains an `otelcol.yaml` is a recipe.
 
-   ```text
-   https://raw.githubusercontent.com/netdata/otelcol-cookbook/master/README.md
-   ```
-
-2. If the README does not name a recipe that matches, list the repo's
-   top-level directories. Every directory that contains an `otelcol.yaml`
-   is a recipe:
+1. Fetch the directory listing:
 
    ```text
    https://api.github.com/repos/netdata/otelcol-cookbook/contents
    ```
 
-3. Read the matching recipe's own README before its YAML:
+2. For each candidate directory whose name suggests a match for the
+   user's use case, read its README before opening the YAML:
 
    ```text
    https://raw.githubusercontent.com/netdata/otelcol-cookbook/master/<recipe>/README.md
@@ -56,8 +52,8 @@ of this skill pack and any cached copy would drift.
 
 ## How to apply a cookbook recipe
 
-1. Identify the recipe directory by reading the cookbook README (step 1
-   above).
+1. Identify the recipe directory from the cookbook contents listing
+   (see "How to find the right recipe" above).
 2. Read the recipe `README.md` end to end. Each `TODO` marker in the
    YAML file corresponds to a decision the operator must make
    (timezone, protocol variant, exporter endpoint).
