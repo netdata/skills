@@ -15,7 +15,7 @@ Each skill is a pair of files: a `SKILL.md` that the agent loads when a user's r
 
 The repo ships a `.claude-plugin/plugin.json` manifest and a `.claude-plugin/marketplace.json` declaration, so it installs into Claude Code via the plugin marketplace mechanism with no extra glue.
 
-### Claude Code (public install, once the repo is public)
+### Claude Code 
 
 ```text
 /plugin marketplace add netdata/skills
@@ -23,22 +23,6 @@ The repo ships a `.claude-plugin/plugin.json` manifest and a `.claude-plugin/mar
 ```
 
 Restart the session (or `/plugin reload`) and the 54 skills activate automatically when a prompt matches a `description`.
-
-### Claude Code (internal testing, private repo)
-
-If you have access to the private `netdata/skills` repo, clone via SSH and point Claude Code at the local checkout as a marketplace:
-
-```bash
-git clone git@github.com:netdata/skills.git ~/netdata-skills
-```
-
-```text
-/plugin marketplace add ~/netdata-skills
-/plugin marketplace update netdata-skills
-/plugin install netdata-skills@netdata-skills
-```
-
-Local paths work identically to GitHub URLs for `/plugin marketplace add`. The `update` step refreshes the marketplace index; it is required on first install for directory-source marketplaces, and also picks up later changes after `git pull`.
 
 ### Verify the install worked
 
