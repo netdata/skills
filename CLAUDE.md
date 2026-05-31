@@ -22,10 +22,22 @@ Tier 1 (foundational):
   live telemetry verification and query.
 - [`skills/netdata-migration/`](./skills/netdata-migration/): migrate from
   Datadog, New Relic, Dynatrace, or Prometheus to Netdata.
+- [`skills/netdata-alert-migration/`](./skills/netdata-alert-migration/):
+  migrate alerting rules from VictoriaMetrics (vmalert), Prometheus, Thanos,
+  or Mimir/Cortex to Netdata health alerts. Stock-first decision, PromQL-to-
+  Netdata translation methodology, the non-translatable constructs, and
+  Alertmanager notification-routing parity. Distinct from netdata-migration,
+  which moves telemetry ingestion rather than alert rules.
 - [`skills/netdata-config-from-requirements/`](./skills/netdata-config-from-requirements/):
   produce a ready-to-hand-off config bundle (otel.yaml, Collector pipeline,
   per-language handoff, verification runbook, open questions) from a customer
   requirements document. Used when no code access is available.
+- [`skills/netdata-custom-collector/`](./skills/netdata-custom-collector/):
+  collect metrics from a target Netdata does not already monitor. Walks the
+  decision tree from the built-in StatsD server (zero collector code) to
+  writing a collector in any language via the external-plugin line protocol,
+  or the legacy python.d / charts.d frameworks. The pull/local-collection
+  counterpart to the OTLP push skills.
 
 Tier 2 (technology-specific troubleshooting, generated from the Netdata
 operator playbooks):
