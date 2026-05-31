@@ -84,6 +84,43 @@ netdata-migration:
     expected_skill: netdata-migration
     expected_rule: parity-expectations.md
 
+netdata-alert-migration:
+  - prompt: "Migrate our vmalert alerting rules to Netdata alerts."
+    expected_skill: netdata-alert-migration
+    expected_rule: choose-what-to-migrate.md
+  - prompt: "Which of our Prometheus alerting rules does Netdata already ship out of the box?"
+    expected_skill: netdata-alert-migration
+    expected_rule: stock-alert-equivalents.md
+  - prompt: "Convert this PromQL alert expression into a Netdata health alert."
+    expected_skill: netdata-alert-migration
+    expected_rule: translate-rules.md
+  - prompt: "How do I migrate a predict_linear or histogram_quantile alert to Netdata?"
+    expected_skill: netdata-alert-migration
+    expected_rule: hard-cases.md
+  - prompt: "Map our Alertmanager Slack and PagerDuty routing onto Netdata notifications."
+    expected_skill: netdata-alert-migration
+    expected_rule: notifications.md
+  - prompt: "How do I verify my migrated Netdata alerts actually loaded and fire?"
+    expected_skill: netdata-alert-migration
+    expected_rule: verify-migration.md
+
+netdata-custom-collector:
+  - prompt: "Netdata has no collector for our internal service. How do I get its metrics in?"
+    expected_skill: netdata-custom-collector
+    expected_rule: choose-an-approach.md
+  - prompt: "How do I push StatsD metrics from my app into Netdata and build a chart from them?"
+    expected_skill: netdata-custom-collector
+    expected_rule: statsd.md
+  - prompt: "Write a Netdata collector in Bash that charts the output of a CLI tool."
+    expected_skill: netdata-custom-collector
+    expected_rule: external-plugin-protocol.md
+  - prompt: "How do I extend the charts.d example module to add another chart?"
+    expected_skill: netdata-custom-collector
+    expected_rule: python-and-bash-modules.md
+  - prompt: "I wrote a custom collector but no charts show up in Netdata. How do I debug it?"
+    expected_skill: netdata-custom-collector
+    expected_rule: verify-a-collector.md
+
 # Tier 2 (a sample; expand as needed)
 troubleshoot-postgresql:
   - prompt: "Postgres connections are maxing out. Help me diagnose."

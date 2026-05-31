@@ -50,6 +50,24 @@ netdata-migration:
   - "prometheus"
   - "replace vendor"
 
+netdata-alert-migration:
+  - "vmalert"
+  - "victoriametrics"
+  - "alerting rules"
+  - "migrate alerts"
+  - "alertmanager"
+  - "health alert"
+  - "promql alert"
+
+netdata-custom-collector:
+  - "write a collector"
+  - "custom collector"
+  - "add a collector"
+  - "charts.d"
+  - "python.d"
+  - "external plugin"
+  - "statsd"
+
 troubleshoot-postgresql:
   - "postgres"
   - "postgresql"
