@@ -189,14 +189,27 @@ service:
       receivers: [otlp, filelog]
       processors: [memory_limiter, k8sattributes, resource, batch]
       exporters: [otlp/netdata]
+    # Only when the target Agent accepts traces (nightly after
+    # 2026-08-17, or the first stable release after v2.11.1).
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, k8sattributes, resource, batch]
+      exporters: [otlp/netdata]
 ```
 
-Notice: `memory_limiter` always first, `batch` always last. No
-trace pipeline against Netdata.
+Notice: `memory_limiter` always first, `batch` always last.
 
-## What NOT to put in a Netdata pipeline
+## Trace-only components
 
-- `tailsampling` / `probabilistic_sampler`: these are trace-only.
-- `spanmetrics`: generates metrics from traces; fine as long as
-  the input traces go to a real trace backend, but do not add
-  this to a Netdata-bound pipeline that has no trace source.
+These apply only to a `traces` pipeline, and only when the target
+Agent accepts traces:
+
+- `tail_sampling` / `probabilistic_sampler`: reduce span volume
+  before it reaches Netdata's trace store. `tail_sampling` needs all
+  spans of a trace on the same Collector, so run it on a gateway
+  behind a trace-ID-aware load balancer, not in a DaemonSet.
+- `spanmetrics` connector: derives request, error, and duration
+  metrics from spans. Use it as the exporter of the `traces` pipeline
+  and the receiver of a `metrics` pipeline that exports to Netdata.
+  Without a `traces` pipeline it has no input; do not add it to a
+  metrics-only Netdata pipeline.

@@ -66,10 +66,12 @@ Example comment style:
 
 ```yaml
 logs:
-  # Rotation defaults documented in
+  # Retention defaults documented in
   # netdata-otel-setup/rules/log-ingestion.md. Adjust only if
   # volume estimates in open-questions.md change.
-  number_of_journal_files: 10
+  retention:
+    default:
+      max_total_size: "10GB"
 ```
 
 ### `netdata/claim.sh`

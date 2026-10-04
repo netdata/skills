@@ -139,6 +139,12 @@ service:
       receivers: [otlp, filelog]
       processors: [memory_limiter, k8sattributes, resource, batch]
       exporters: [otlp/netdata]
+    # Only when the target Agent accepts traces (nightly after
+    # 2026-08-17, or the first stable release after v2.11.1).
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, k8sattributes, resource, batch]
+      exporters: [otlp/netdata]
 ```
 
 The DaemonSet:

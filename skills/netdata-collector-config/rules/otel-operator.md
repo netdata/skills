@@ -125,7 +125,7 @@ spec:
     - name: OTEL_METRICS_EXPORTER
       value: otlp
     - name: OTEL_TRACES_EXPORTER
-      value: none
+      value: otlp
     - name: OTEL_LOGS_EXPORTER
       value: none
   nodejs:
@@ -149,11 +149,13 @@ metadata:
 The operator handles the init container that copies the SDK into
 the app container's filesystem and the env-var wiring.
 
-Note the `OTEL_TRACES_EXPORTER=none` and
-`OTEL_LOGS_EXPORTER=none`: Netdata does not accept traces, and the
-auto-instrumentation's logs exporter is often more trouble than
-it is worth. Start with metrics only, add more signals once the
-baseline works.
+Note `OTEL_TRACES_EXPORTER=otlp`: the gateway forwards spans to
+Netdata through its `traces` pipeline. Set it to `none` when the
+target Agent has no trace receiver (stable v2.11.x and older), or
+when the gateway has no `traces` pipeline. `OTEL_LOGS_EXPORTER=none`
+is deliberate: the auto-instrumentation's logs exporter is often
+more trouble than it is worth. Start with metrics and traces, add
+logs once the baseline works.
 
 ## When not to use the operator
 

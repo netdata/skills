@@ -68,9 +68,13 @@ semantic-convention names where they exist
 
 ## Transaction traces
 
-New Relic APM's trace view has no direct Netdata equivalent today.
-Ship traces to a trace backend (Tempo or NR itself) in parallel.
-Netdata trace support lands in a later release.
+Send OTel spans to Netdata and explore them in the Traces tab
+(search, trace-ID lookup, slowest traces, attribute filters). This
+needs an Agent with trace support (nightly after 2026-08-17, or the
+first stable release after v2.11.1). During the parallel run,
+fan the same spans out to New Relic from the Collector so both views
+can be compared. On a stable v2.11.x Agent, keep traces in New Relic
+until the Agent is upgraded.
 
 ## What Netdata will NOT replicate
 
@@ -78,4 +82,7 @@ Netdata trace support lands in a later release.
   view. Netdata has a node-centric view instead.
 - NR Synthetics (browser/script probes). Use a separate tool
   (Pingdom, Checkly, a cron job with a curl probe).
-- Distributed tracing UX. Pending Netdata trace support.
+- New Relic's APM UX on top of traces (service maps, transaction
+  breakdowns, errors inbox). Netdata's Traces tab covers search and
+  single-trace views; the rest is not verified, so do not promise
+  it.

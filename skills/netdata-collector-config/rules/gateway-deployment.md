@@ -13,7 +13,11 @@ Use a gateway when:
 - You have many producers that should not each carry Netdata
   credentials.
 - You want to route subsets of telemetry to different backends
-  (e.g., metrics to Netdata, traces to Tempo).
+  (e.g., metrics and traces to Netdata, a copy of traces to an
+  existing trace backend during a migration).
+- You want tail-based trace sampling. It needs every span of a
+  trace on one Collector, which a gateway (behind a trace-ID-aware
+  load balancer) can provide.
 
 Do not use a gateway as the only collection tier when you also
 need node-level signals; those need a DaemonSet. It is common to
@@ -24,9 +28,9 @@ telemetry.
 
 ```text
 [ SDK / DaemonSet ]  -->  [ Gateway Deployment ]  -->  [ Netdata ]
-                              (N replicas)
+                              (N replicas)          (metrics, logs, traces)
                                        |
-                                       +-->  [ Trace backend ]
+                                       +-->  [ Other backend ] (optional)
 ```
 
 ## Config
@@ -68,6 +72,12 @@ service:
       processors: [memory_limiter, resource, batch]
       exporters: [otlp/netdata]
     logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [otlp/netdata]
+    # Only when the target Agent accepts traces (nightly after
+    # 2026-08-17, or the first stable release after v2.11.1).
+    traces:
       receivers: [otlp]
       processors: [memory_limiter, resource, batch]
       exporters: [otlp/netdata]

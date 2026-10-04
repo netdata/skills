@@ -44,7 +44,7 @@ The agent reads every skill's frontmatter, compares the user prompt against the 
 ### Good description
 
 ```yaml
-description: Use when enabling the Netdata otel.plugin, writing /etc/netdata/otel.yaml, defining metric-to-chart mappings, configuring TLS on the OTLP receiver, or debugging OTLP ingestion issues with Netdata. Covers OTLP gRPC ingestion for metrics (v2.7.0+) and logs (v2.9.0+). Traces are not yet supported.
+description: Use when enabling the Netdata otel.plugin, writing /etc/netdata/otel.yaml, defining metric-to-chart mappings, configuring TLS on the OTLP receiver, setting log or trace retention, or debugging OTLP ingestion issues with Netdata. Covers OTLP gRPC ingestion for metrics (v2.7.0+), logs (v2.9.0+, current storage schema v2.11.0+), and traces (nightly builds after v2.11.1; not in stable v2.11.x).
 ```
 
 Why it works:
@@ -52,7 +52,7 @@ Why it works:
 - Starts with "Use when".
 - Lists three specific tasks a user might ask about.
 - Mentions concrete identifiers (`otel.plugin`, `/etc/netdata/otel.yaml`, `OTLP gRPC`) the agent can match on.
-- States a scope boundary (traces not yet supported).
+- States a version boundary (traces only on nightly builds after v2.11.1).
 
 ### Bad description
 

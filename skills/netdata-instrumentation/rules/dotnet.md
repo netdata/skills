@@ -26,7 +26,7 @@ export OTEL_RESOURCE_ATTRIBUTES=service.version=1.4.0,deployment.environment=pro
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://netdata.example.internal:4317
 export OTEL_EXPORTER_OTLP_PROTOCOL=grpc
 export OTEL_METRICS_EXPORTER=otlp
-export OTEL_TRACES_EXPORTER=none
+export OTEL_TRACES_EXPORTER=otlp   # "none" if the Agent has no trace receiver
 export OTEL_LOGS_EXPORTER=none
 dotnet run
 ```
@@ -79,9 +79,25 @@ app.Run();
 
 ## Traces
 
-Netdata does not accept traces yet. Either omit `.WithTracing(...)`
-entirely, or register traces with a different exporter pointed at a
-real trace backend.
+When the Agent accepts traces (nightly after 2026-08-17, or the first
+stable release after v2.11.1), chain `.WithTracing(...)` after
+`.WithMetrics(...)` in `Program.cs` (add `using OpenTelemetry.Trace;`):
+
+```csharp
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddOtlpExporter(o =>
+        {
+            o.Endpoint = new Uri(
+                Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT") ?? "http://localhost:4317");
+            o.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
+        }));
+```
+
+On stable v2.11.x or older, omit `.WithTracing(...)` (or set
+`OTEL_TRACES_EXPORTER=none` on the automatic path). Spans appear in the
+Traces tab under the service name.
 
 ## Legacy .NET Framework
 

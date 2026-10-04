@@ -85,9 +85,27 @@ sudo systemctl restart netdata
 
 There is no SIGHUP-based hot reload for the OTLP certs.
 
+## Tenant selection (logs and traces)
+
+With `auth.enabled: true` (v2.11.0+), senders must set the
+`X-Scope-OrgID` gRPC header. Its value selects the tenant that owns the
+log records and spans, and keys per-tenant retention entries under
+`logs:` and `traces:`. Metrics are not tenant-scoped.
+
+```yaml
+auth:
+  enabled: true
+```
+
+This is tenant selection, not authentication. Anyone who can reach the
+port can claim any tenant, so trust the header only behind TLS or mTLS
+and network controls. With `auth.enabled: false`, all logs and traces
+belong to the `default` tenant.
+
 ## What you cannot do
 
-- There is no way to require a bearer token on the OTLP endpoint.
+- There is no way to require a bearer token on the OTLP endpoint. The
+  `X-Scope-OrgID` header selects a tenant; it does not authenticate.
 - There is no built-in per-tenant quota or rate limiting on incoming OTLP.
 - There is no way to route different producers to different chart configs
   based on auth identity. All producers share the same mapping dir.

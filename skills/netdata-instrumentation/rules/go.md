@@ -140,15 +140,48 @@ http.Handle("/hello", otelhttp.NewHandler(
 ))
 ```
 
-`otelhttp` records span data (not exported to Netdata yet) and HTTP
-server metrics (exported).
+`otelhttp` records spans and HTTP server metrics. Spans are exported
+only when a tracer provider is registered (see below).
 
 ## Traces
 
-Netdata does not accept traces yet. Do not register a
-`WithBatcher(OTLPTraceExporter)` pointed at Netdata. If the app needs
-tracing in parallel, register a separate trace exporter against a trace
-backend.
+Register a tracer provider with the gRPC trace exporter when the Agent
+accepts traces (nightly after 2026-08-17, or the first stable release
+after v2.11.1). Skip it on stable v2.11.x or older; every export fails
+there.
+
+```bash
+go get \
+  go.opentelemetry.io/otel/sdk/trace \
+  go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc
+```
+
+```go
+import (
+    "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+    sdktrace "go.opentelemetry.io/otel/sdk/trace"
+)
+
+func initTracerProvider(ctx context.Context, endpoint string, res *resource.Resource) (*sdktrace.TracerProvider, error) {
+    exporter, err := otlptracegrpc.New(ctx,
+        otlptracegrpc.WithEndpoint(endpoint), // bare host:port, as for metrics
+        otlptracegrpc.WithInsecure(),
+    )
+    if err != nil {
+        return nil, err
+    }
+    tp := sdktrace.NewTracerProvider(
+        sdktrace.WithBatcher(exporter),
+        sdktrace.WithResource(res),
+    )
+    otel.SetTracerProvider(tp)
+    return tp, nil
+}
+```
+
+Reuse the endpoint and resource from `initMeterProvider`, and call
+`tp.Shutdown(ctx)` next to `mp.Shutdown(ctx)` so the last batch of spans
+is flushed. Spans appear in the Traces tab under the service name.
 
 ## Verification
 

@@ -33,8 +33,16 @@ parity is possible.
 
 ## Key facts
 
-- Netdata accepts metrics and logs via OTLP/gRPC. Traces are not
-  yet accepted; plan trace routing separately.
+- Netdata accepts metrics, logs, and traces via OTLP/gRPC. Traces
+  need a Netdata Agent built from `master` after 2026-08-17 (nightly)
+  or the first stable release after v2.11.1. Stable v2.11.x has no
+  trace receiver; on it, keep traces on the old backend until the
+  Agent is upgraded.
+- Netdata's Traces tab covers trace search, lookup by trace ID, the
+  slowest traces, a duration overview, and attribute facets. It is
+  not a full APM suite; see
+  [`rules/parity-expectations.md`](./rules/parity-expectations.md)
+  for the gaps.
 - Most vendor SDKs (Datadog, New Relic, Dynatrace) now have an
   OpenTelemetry-compatible mode or a first-party exporter. Prefer
   that path over writing a second agent.
@@ -51,7 +59,8 @@ parity is possible.
 ## Step-by-step
 
 1. Inventory what the current stack emits:
-   - Traces (note separately; Netdata won't take them yet).
+   - Traces (a migration target when the Agent accepts traces;
+     check the version first).
    - Metrics (the main migration target).
    - Logs (second migration target).
    - Vendor-specific events (sometimes unportable).
@@ -81,16 +90,19 @@ parity is possible.
 - Leaving the vendor SDK loaded alongside the OTel SDK in the
   same process. They often patch the same libraries and conflict.
   Remove the vendor SDK fully.
-- Trying to forward traces to Netdata. The gRPC connection
-  succeeds; traces are silently dropped. Route traces to Jaeger,
-  Tempo, or the old vendor (as a stop-gap) while Netdata trace
-  support lands.
+- Forwarding traces to a stable v2.11.x (or older) Agent. It has no
+  trace receiver; every export fails. Check trace support first (see
+  `skills/netdata-otel-setup/rules/trace-ingestion.md`).
+- Leaving trace sampling at the vendor's defaults. Netdata keeps
+  every span it receives, bounded by `traces.retention` (1GB or 7
+  days by default). Size retention, or sample in the Collector, before
+  cutover.
 - Expecting metric names to carry over. OTel semantic conventions
   differ from Datadog/New Relic metric names. Use OTel names
   going forward; rebuild dashboards against them.
 - Trying to replay historical vendor data into Netdata. There is
-  no backfill tool. Cutover's retention starts at the cutover
-  date.
+  no backfill tool, and Netdata rejects spans that started more than
+  24 hours ago. Cutover's retention starts at the cutover date.
 
 ## Migration sequencing
 

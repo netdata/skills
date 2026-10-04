@@ -40,7 +40,7 @@ export OTEL_RESOURCE_ATTRIBUTES=service.version=1.4.0,deployment.environment=pro
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://netdata.example.internal:4317
 export OTEL_EXPORTER_OTLP_PROTOCOL=grpc
 export OTEL_METRICS_EXPORTER=otlp
-export OTEL_TRACES_EXPORTER=none
+export OTEL_TRACES_EXPORTER=otlp   # "none" if the Agent has no trace receiver
 export OTEL_LOGS_EXPORTER=none
 ```
 
@@ -90,8 +90,17 @@ register_shutdown_function(function () use ($meterProvider) {
 
 ## Traces
 
-Netdata does not accept traces yet. Keep `OTEL_TRACES_EXPORTER=none`
-in env or omit the trace bootstrap entirely.
+With the PECL extension and `OTEL_PHP_AUTOLOAD_ENABLED=true`,
+`OTEL_TRACES_EXPORTER=otlp` plus `OTEL_EXPORTER_OTLP_PROTOCOL=grpc`
+sends spans to Netdata. The gRPC protocol needs the
+`open-telemetry/transport-grpc` Composer package and the `grpc` PHP
+extension; without them, use an OTel Collector sidecar that accepts
+OTLP/HTTP and forwards over gRPC.
+
+Use traces only when the Agent accepts them (nightly after 2026-08-17,
+or the first stable release after v2.11.1). Otherwise keep
+`OTEL_TRACES_EXPORTER=none`. Spans appear in the Traces tab under the
+service name.
 
 ## Verification
 

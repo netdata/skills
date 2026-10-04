@@ -1,6 +1,6 @@
 ---
 name: netdata-otel-setup
-description: Use when enabling the Netdata otel.plugin, writing /etc/netdata/otel.yaml, defining metric-to-chart mappings, configuring TLS on the OTLP receiver, or debugging OTLP ingestion issues with Netdata. Covers OTLP gRPC ingestion for metrics (v2.7.0+) and logs (v2.9.0+). Traces are not yet supported.
+description: Use when enabling the Netdata otel.plugin, writing /etc/netdata/otel.yaml, defining metric-to-chart mappings, configuring TLS on the OTLP receiver, setting log or trace retention, or debugging OTLP ingestion issues with Netdata. Covers OTLP gRPC ingestion for metrics (v2.7.0+), logs (v2.9.0+, current storage schema v2.11.0+), and traces (nightly builds after v2.11.1; not in stable v2.11.x).
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -12,6 +12,7 @@ tags:
   - setup
   - metrics
   - logs
+  - traces
 ---
 
 # Netdata OTel setup
@@ -21,52 +22,81 @@ data from collectors, SDKs, or instrumented applications over OTLP/gRPC.
 
 ## When to use this skill
 
-- The user wants Netdata to ingest metrics or logs sent via OTLP.
+- The user wants Netdata to ingest metrics, logs, or traces sent via OTLP.
 - The user is editing `otel.yaml` or placing files in `/etc/netdata/otel.d/`.
 - An OTLP client reports that it cannot connect to the Netdata endpoint.
 - Metrics arrive but render as generic unmapped charts and the user wants
   named dimensions.
 - The user needs to turn on TLS on the OTLP receiver, or enable mTLS with a
   client CA.
-- The user is debugging log ingestion and journal rotation.
+- The user is sizing log or trace retention, or offloading them to object
+  storage.
 
 ## Key facts
 
 - Plugin: `otel-plugin` binary (Rust); `otel.plugin` is the logical integration id on the dashboard.
-- Platform support: Linux only. Windows is not supported by the plugin.
+- Platform support: Linux and macOS. Windows and FreeBSD are not supported.
 - Transport: **OTLP/gRPC only** on the configured endpoint. OTLP/HTTP
-  (port 4318) is not accepted.
+  (port 4318) is not accepted, for any signal.
 - Default endpoint: `127.0.0.1:4317`. Bind to `0.0.0.0:4317` to accept remote
   traffic. Configurable via `endpoint.path`.
-- Signals accepted: metrics (stable since v2.7.0) and logs (stable since
-  v2.9.0). Traces are not yet accepted.
+- Signals accepted, by Agent version:
+  - Metrics: v2.7.0 and later.
+  - Logs: v2.9.0 and later. v2.11.0 replaced the journal-file store with an
+    indexed store and a new `otel.yaml` schema.
+  - Traces: Netdata builds from `master` after 2026-08-17 (nightly), and the
+    first stable release after v2.11.1. Stable v2.11.x has no trace
+    receiver. See [`rules/trace-ingestion.md`](./rules/trace-ingestion.md)
+    for the version check.
 - Config file: `otel.yaml` inside the Netdata config directory (usually
   `/etc/netdata/otel.yaml` for native packages, or
   `/opt/netdata/etc/netdata/otel.yaml` for static installs). Edit via
-  `sudo ./edit-config otel.yaml` from the config directory.
-- Env-var overrides: any config option can be overridden by an environment
-  variable named `NETDATA_OTEL_` plus the option path in uppercase with dots
-  replaced by underscores. Example: `endpoint.tls_cert_path` becomes
-  `NETDATA_OTEL_ENDPOINT_TLS_CERT_PATH`. Env vars have the highest priority.
+  `sudo ./edit-config otel.yaml` from the config directory. The stock copy
+  lives in `/usr/lib/netdata/conf.d/otel.yaml`.
+- Parsing is strict (v2.11.0+). Unknown fields, malformed values, and keys
+  from the former schema (`size_of_journal_file`, `number_of_journal_files`,
+  `store_otlp_json`, and similar) stop the plugin from starting.
+  `logs.journal_dir` is still accepted, only to locate the former
+  plugin's read-only journals.
+- Env-var overrides: `NETDATA_OTEL_CFG_` plus the option path in uppercase
+  with dots replaced by underscores. Example: `endpoint.tls_cert_path`
+  becomes `NETDATA_OTEL_CFG_ENDPOINT_TLS_CERT_PATH`. For `default`
+  rotation and retention entries, drop the `default` segment:
+  `traces.retention.default.max_age` becomes
+  `NETDATA_OTEL_CFG_TRACES_RETENTION_MAX_AGE`. Env vars have the highest
+  priority. Agents before v2.11.0 used the `NETDATA_OTEL_` prefix.
 - Metric mapping directory: `/etc/netdata/otel.d/v1/metrics/`. Each YAML file
   can contain multiple mappings keyed by OTLP metric name. User files take
   priority over stock mappings.
 - Chart layout is controlled by mapping files via `dimension_attribute_key`,
   not by OTLP attributes emitted by the producer. Set the attribute on the
   data point in your producer, then name that attribute in the mapping file.
-- Logs default journal dir is `/var/log/netdata/otel/v1`. Override with
-  `logs.journal_dir` if the `netdata` user cannot write there.
+- Logs and traces are stored under `base_dir` (default
+  `/var/log/netdata/otel/v2`), one subtree per signal. Each signal has its
+  own `rotation` and `retention` section (defaults: 1GB or 7 days,
+  whichever comes first). `remote_storage` (S3 or filesystem offload) and
+  `auth` (tenant selection via `X-Scope-OrgID`) are shared by logs and
+  traces.
+- Logs are explored in the Logs tab (`otel-logs` source); traces in the
+  Traces tab (`otel-traces` Function). Both views require a signed-in
+  Netdata Cloud user of the Agent's Space. The data stays on the Agent.
 - The plugin automatically expires charts with no incoming data after
   `metrics.expiry_duration_secs` (default 900s).
 
 ## Step-by-step
 
-1. Verify Netdata version is recent enough.
+1. Verify the Netdata version supports the signals you need.
 
    ```bash
    netdata -v
-   # Expect v2.7.0 or later for metrics, v2.9.0 or later for logs.
+   # v2.7.0+ for metrics, v2.9.0+ for logs (v2.11.0+ for the schema below).
+   # Traces: the stock config must contain a traces section.
+   grep -c '^traces:' /usr/lib/netdata/conf.d/otel.yaml \
+     /opt/netdata/usr/lib/netdata/conf.d/otel.yaml 2>/dev/null
    ```
+
+   A count of `0` (or no file) means the Agent cannot receive traces.
+   Route traces elsewhere, or move the Agent to a nightly build.
 
 2. Open the config file with `edit-config` (this preserves permissions and
    copies from the stock template).
@@ -77,20 +107,32 @@ data from collectors, SDKs, or instrumented applications over OTLP/gRPC.
    ```
 
 3. Set the endpoint. For local-only traffic, leave the default. For remote
-   OTLP clients, bind on `0.0.0.0`.
+   OTLP clients, bind on `0.0.0.0` and protect the port (TLS, firewall).
 
    ```yaml
    endpoint:
      path: "0.0.0.0:4317"
    ```
 
-4. Logs ingestion is always on. The default journal directory is
-   `/var/log/netdata/otel/v1`. Override only if the default is unsuitable.
+4. Logs and traces ingestion are always on. Change retention only when the
+   defaults are wrong for the volume. A user file needs only the fields
+   that change.
 
    ```yaml
    logs:
-     journal_dir: /var/log/netdata/otel/v1
+     retention:
+       default:
+         max_total_size: "10GB"
+         max_age: "30 days"
+   traces:
+     retention:
+       default:
+         max_total_size: "10GB"
+         max_age: "30 days"
    ```
+
+   Omit the `traces:` block on an Agent without trace support; strict
+   parsing rejects it there.
 
 5. Restart Netdata to pick up changes.
 
@@ -106,8 +148,9 @@ data from collectors, SDKs, or instrumented applications over OTLP/gRPC.
    ```
 
 7. Send a test metric from an OTLP client and watch it appear on the
-   Netdata dashboard at `http://HOST:19999`. See the MCP integration skill
-   for programmatic verification.
+   Netdata dashboard at `http://HOST:19999`. For traces, send spans and
+   open the Traces tab. See the MCP integration skill for programmatic
+   verification.
 
 8. If the metric renders with unhelpful dimension names, add a mapping file.
    See [`rules/metric-mapping.md`](./rules/metric-mapping.md).
@@ -115,26 +158,32 @@ data from collectors, SDKs, or instrumented applications over OTLP/gRPC.
 ## Common mistakes
 
 - Pointing an OTLP/HTTP client at the Netdata endpoint. The plugin does not
-  accept OTLP/HTTP yet. Use gRPC.
-- Trying to send traces. Netdata does not yet accept trace signals. Route
-  traces to a dedicated backend (Jaeger, Tempo, or an external SaaS) until
-  trace support lands.
+  accept OTLP/HTTP. Use gRPC. Many SDKs default to `http/protobuf`; set
+  `OTEL_EXPORTER_OTLP_PROTOCOL=grpc`.
+- Sending traces to a stable v2.11.x Agent. It has no trace receiver.
+  Check for trace support first (step 1).
+- Copying an `otel.yaml` written for v2.10 or earlier. Keys such as
+  `size_of_journal_file`, `number_of_journal_files`, and `store_otlp_json` stop
+  the v2.11.0+ plugin at startup. Rebuild the file from the current stock
+  config.
+- Expecting `logs.retention` to also bound traces. Traces have their own
+  `traces.retention` section.
+- Treating `retention.*.max_total_size` as a disk cap. Write-ahead logs,
+  catalogs, and the remote-read cache are additional.
 - Binding to `0.0.0.0` without also considering firewall rules. A public
   `4317` is a denial-of-service target. Gate it at the host firewall.
 - Editing `otel.yaml` directly inside `/usr/lib/netdata` or similar stock
   paths. Stock configs get overwritten on upgrade. Always use the
   user-level config directory via `edit-config`.
-- Setting `logs.journal_dir` to a path the `netdata` user cannot write to.
-  Pick a writable path or keep the default.
 - Mapping files with instrumentation-scope regexes that do not match the
-  actual scope name. Verify the scope before writing a mapping by looking
-  at the raw OTLP envelope (enable `logs.store_otlp_json: true` while
-  debugging).
+  actual scope name. Verify the scope before writing a mapping by sending
+  the same data through a Collector `debug` exporter with
+  `verbosity: detailed`.
 - Unknown fields in a mapping file. The plugin parses mapping files with
   `deny_unknown_fields`, so a typo in `dimesion_attribute_key` (note the
-  typo) causes the whole file to fall back to defaults and logs an error.
-- Expecting env vars without the `NETDATA_OTEL_` prefix to override config.
-  The prefix is required.
+  typo) causes the whole file to be skipped and logs an error.
+- Expecting env vars without the `NETDATA_OTEL_CFG_` prefix to override
+  config on v2.11.0+.
 
 ## Verification
 
@@ -172,15 +221,22 @@ Then confirm the metric arrived:
 curl -s 'http://localhost:19999/api/v2/contexts' | jq '.contexts | keys[]' | grep smoketest
 ```
 
-A non-empty match confirms end-to-end ingestion. For the canonical
-end-to-end fixture, see [`tests/e2e/`](../../tests/e2e/) in this repo.
+A non-empty match confirms end-to-end ingestion. For a trace smoke test,
+see [`rules/trace-ingestion.md`](./rules/trace-ingestion.md). For the
+canonical end-to-end fixture, see [`tests/e2e/`](../../tests/e2e/) in this
+repo.
 
 ## References
 
 - [`rules/enable-otlp-receiver.md`](./rules/enable-otlp-receiver.md)
 - [`rules/metric-mapping.md`](./rules/metric-mapping.md)
 - [`rules/log-ingestion.md`](./rules/log-ingestion.md)
+- [`rules/trace-ingestion.md`](./rules/trace-ingestion.md)
 - [`rules/tls-and-auth.md`](./rules/tls-and-auth.md)
 - [`rules/troubleshooting.md`](./rules/troubleshooting.md)
 - Netdata integration doc: https://learn.netdata.cloud/docs/collecting-metrics/opentelemetry
-- Netdata source: `src/crates/netdata-otel/otel-plugin/integrations/opentelemetry.md` in the Netdata repo.
+- Netdata source: `src/crates/otel-plugin/integrations/opentelemetry.md`
+  and `src/crates/otel-plugin/configs/otel.yaml.in` in the Netdata repo.
+- Netdata docs: `docs/opentelemetry/otlp-ingestion.md`,
+  `docs/opentelemetry/trace-storage-and-retention.md`,
+  `docs/logs/log-storage-and-retention.md` in the Netdata repo.

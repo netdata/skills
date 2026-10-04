@@ -40,8 +40,11 @@ referenced in the `References` section for deeper guidance.
 
 ## Do not
 
-- Claim that Netdata accepts OTLP traces yet. It does not (as of v0.1.0 of
-  these skills). Route traces to a different backend.
+- Claim that every Netdata Agent accepts OTLP traces. Trace ingestion
+  ships in Agents built from `master` after 2026-08-17 (nightly) and in
+  the first stable release after v2.11.1. Stable v2.11.x has no trace
+  receiver. Check the Agent first
+  (`skills/netdata-otel-setup/rules/trace-ingestion.md`).
 - Claim that `_nd_chart_instance` or `_nd_dimension` is a valid
   producer-side OTLP attribute. `_nd_chart_instance` does not exist
   in Netdata's source at all. `_nd_dimension` exists only inside
