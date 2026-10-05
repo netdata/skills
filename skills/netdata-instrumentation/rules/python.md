@@ -91,13 +91,14 @@ from environment variables and patches supported libraries.
 ```bash
 opentelemetry-instrument \
   --metrics_exporter otlp \
-  --traces_exporter none \
+  --traces_exporter otlp \
   --logs_exporter otlp \
   python app.py
 ```
 
-`--traces_exporter none` is required: Netdata does not yet accept
-traces. `--logs_exporter otlp` wires the Python stdlib `logging`
+`--traces_exporter otlp` sends spans to Netdata. Use
+`--traces_exporter none` when the Agent has no trace receiver (stable
+v2.11.x or older). `--logs_exporter otlp` wires the Python stdlib `logging`
 module to the OTLP logs pipeline, including a `LoggingHandler`
 attached to the root logger. No code change to the service is needed
 on this path.
@@ -111,19 +112,41 @@ export DEPLOYMENT_ENV=production
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://netdata.example.internal:4317
 export OTEL_EXPORTER_OTLP_PROTOCOL=grpc
 export OTEL_METRICS_EXPORTER=otlp
-export OTEL_TRACES_EXPORTER=none
+export OTEL_TRACES_EXPORTER=otlp   # "none" if the Agent has no trace receiver
 export OTEL_LOGS_EXPORTER=otlp
 ```
+
+## Traces with the manual init
+
+The manual `instrument.py` above sets up metrics and logs only. To send
+spans, add a tracer provider with the gRPC span exporter (shipped in
+`opentelemetry-exporter-otlp-proto-grpc`):
+
+```python
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+tracer_provider = TracerProvider(resource=resource)
+tracer_provider.add_span_processor(
+    BatchSpanProcessor(OTLPSpanExporter(endpoint=ENDPOINT, insecure=True))
+)
+trace.set_tracer_provider(tracer_provider)
+```
+
+Add it only when the Agent accepts traces (nightly after 2026-08-17, or
+the first stable release after v2.11.1). Spans appear in the Traces tab
+under the service name.
 
 ## What Netdata does with OTLP logs
 
 OTLP/gRPC log ingestion is always on once `otel-plugin` is running.
-Ingested records are written to systemd-compatible journal files at
-`/var/log/netdata/otel/v1`. Inspect with
-`journalctl -D /var/log/netdata/otel/v1 SERVICE_NAME=<service>`.
-Resource attributes become journal fields with upper-case names.
-Rotation and retention knobs live under `logs:` in `otel.yaml`; stock
-defaults cap at 10 files totalling 1 GB over 7 days. Full reference:
+On v2.11.0 and later, records are indexed under
+`/var/log/netdata/otel/v2/logs` and explored in the Logs tab
+(`otel-logs` source, filtered by service). Retention lives under
+`logs.retention` in `otel.yaml`; stock defaults keep up to 1 GB or 7
+days, whichever comes first. Full reference:
 [`netdata-otel-setup/rules/log-ingestion.md`](../../netdata-otel-setup/rules/log-ingestion.md).
 
 ## Framework notes

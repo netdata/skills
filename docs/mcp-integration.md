@@ -47,8 +47,8 @@ One write-ish tool: `execute_function`. The Netdata `functions` subsystem lets y
 
 ## What MCP does NOT give the agent
 
-- **Trace data**: Netdata does not accept OTLP traces yet (as of skill-pack v0.1.0). Route traces elsewhere.
-- **Log queries by free-form text**: Netdata's logs surface through the dashboard Logs tab and systemd journal queries. MCP does not yet expose a full-text log search tool.
+- **Trace queries**: Agents with trace support (nightly after 2026-08-17, or the first stable release after v2.11.1) store spans and serve them through the `otel-traces` Function in the dashboard's Traces tab. MCP has no dedicated trace tool. The Function is restricted to signed-in Netdata Cloud users of the Agent's Space; whether `execute_function` can call it from an MCP client is not verified.
+- **Log queries by free-form text**: Netdata's logs surface through the dashboard Logs tab (`otel-logs` source for OTLP logs). MCP does not yet expose a full-text log search tool.
 - **Arbitrary SQL / code execution on the host**: `execute_function` is constrained to Netdata-registered functions. To run an arbitrary shell command, use SSH.
 - **Write access to alert config**: alerts are managed via config files on the Netdata host.
 

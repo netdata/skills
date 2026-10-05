@@ -25,7 +25,7 @@ java -javaagent:/opt/otel/opentelemetry-javaagent.jar \
      -Dotel.exporter.otlp.endpoint=http://netdata.example.internal:4317 \
      -Dotel.exporter.otlp.protocol=grpc \
      -Dotel.metrics.exporter=otlp \
-     -Dotel.traces.exporter=none \
+     -Dotel.traces.exporter=otlp \
      -Dotel.logs.exporter=none \
      -jar checkout.jar
 ```
@@ -42,7 +42,7 @@ export OTEL_RESOURCE_ATTRIBUTES=deployment.environment=production
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://netdata.example.internal:4317
 export OTEL_EXPORTER_OTLP_PROTOCOL=grpc
 export OTEL_METRICS_EXPORTER=otlp
-export OTEL_TRACES_EXPORTER=none
+export OTEL_TRACES_EXPORTER=otlp
 export OTEL_LOGS_EXPORTER=none
 ```
 
@@ -52,7 +52,7 @@ Out of the box the agent instruments Servlet containers (Tomcat,
 Jetty, Undertow), Spring Web, Spring Boot, JDBC, Hibernate, HTTP
 clients (Apache HttpClient, OkHttp, the JDK `HttpClient`), gRPC, Kafka
 clients, JMS, Redis (Lettuce, Jedis), and many others. Each adds
-matching metrics.
+matching metrics and spans.
 
 ## Manual SDK init (when the agent cannot run)
 
@@ -92,8 +92,36 @@ OpenTelemetrySdk sdk = OpenTelemetrySdk.builder()
 
 ## Traces
 
-Netdata does not accept traces yet. Set `otel.traces.exporter=none` or
-point traces at a different backend (Jaeger, Tempo, external vendor).
+With the agent, `otel.traces.exporter=otlp` and
+`otel.exporter.otlp.protocol=grpc` send spans to Netdata on the same
+endpoint as metrics. The agent's default protocol is `http/protobuf`, so
+keep the protocol setting explicit.
+
+When the Agent has no trace receiver (stable v2.11.x or older), set
+`otel.traces.exporter=none` (or `OTEL_TRACES_EXPORTER=none`).
+
+With manual SDK wiring, add a tracer provider to the builder above:
+
+```java
+.setTracerProvider(
+    SdkTracerProvider.builder()
+        .addSpanProcessor(
+            BatchSpanProcessor.builder(
+                OtlpGrpcSpanExporter.builder()
+                    .setEndpoint("http://netdata.example.internal:4317")
+                    .build()
+            ).build()
+        )
+        .setResource(resource)
+        .build()
+)
+```
+
+`resource` is the `Resource` built inline for the meter provider above;
+extract it to a local variable so both providers share it. Spans
+appear in the Traces tab under the service name. See
+`skills/netdata-otel-setup/rules/trace-ingestion.md` for the version
+check.
 
 ## Shading pitfall
 

@@ -68,7 +68,8 @@ metric attributes in either system. Move them to logs.
    OTel Collector.
 3. Configure the Collector with two exporters: the Datadog
    exporter (keeps ddtrace's backend happy for the parallel
-   window) and the Netdata exporter.
+   window) and the Netdata exporter. Add both to the `traces`
+   pipeline too when the Agent accepts traces.
 4. Gradually remove dd-trace from services. Each removal is one
    PR; revert is easy.
 5. Once all services are on OTel, drop the Datadog exporter from
@@ -81,7 +82,13 @@ metric attributes in either system. Move them to logs.
   detection; check the `find_anomalous_metrics` MCP tool).
 - SLO dashboards. Netdata has SLO-adjacent features but not
   feature-for-feature parity.
-- APM trace exploration. Netdata does not take traces yet.
+- Datadog APM's UX on top of traces (service map, service pages,
+  error tracking). Netdata's Traces tab covers trace search,
+  trace-ID lookup, the slowest traces, and attribute filters; the
+  rest is not verified, so do not promise it.
 
-Route traces to a trace backend (Jaeger, Tempo, external vendor)
-until Netdata trace support ships.
+Traces themselves migrate to Netdata when the Agent supports them
+(nightly after 2026-08-17, or the first stable release after
+v2.11.1). Keep the Datadog exporter on the Collector's `traces`
+pipeline during the parallel window. On a stable v2.11.x Agent, keep
+traces in Datadog until the Agent is upgraded.

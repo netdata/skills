@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- OpenTelemetry trace support across the Tier 1 skills. Netdata Agents
+  built from `master` after 2026-08-17 (nightly, netdata/netdata
+  #23479) and the first stable release after v2.11.1 receive OTLP/gRPC
+  traces, store them on the receiving Agent, and serve them in the
+  Traces tab through the `otel-traces` Function. Stable v2.11.x has no
+  trace receiver, so every trace instruction is gated on a version
+  check.
+  - `netdata-otel-setup`: new `rules/trace-ingestion.md` (version
+    check, storage, `traces.retention`, offloading, rejected spans,
+    tenants, `telemetrygen` smoke test).
+  - `netdata-instrumentation`: trace exporters for Node.js, Python,
+    Java, Go, .NET, Ruby (gRPC gem), and PHP replace
+    `OTEL_TRACES_EXPORTER=none`, with `none` kept for older Agents.
+  - `netdata-collector-config`: `traces` pipelines on the DaemonSet,
+    gateway, and Operator patterns; trace-only processors
+    (`tail_sampling`, `probabilistic_sampler`, `spanmetrics`).
+  - `netdata-migration`: APM traces migrate to the Traces tab, with
+    unverified APM features (service maps, error tracking) listed as
+    gaps.
+  - `netdata-config-from-requirements`: trace ingestion slot and
+    signal / span-volume extraction.
+
 - `netdata-collector-config` now references the
   [`netdata/otelcol-cookbook`](https://github.com/netdata/otelcol-cookbook)
   repo as the source of truth for end-to-end Collector recipes.
@@ -59,6 +81,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Node.js was actually exercised on every push.
 
 ### Changed
+
+- `netdata-otel-setup` now documents the `otel.yaml` schema shipped
+  since v2.11.0: `base_dir`, per-signal `rotation` / `retention`,
+  shared `remote_storage` and `auth`, strict parsing, the
+  `NETDATA_OTEL_CFG_` env-var prefix, and macOS support. The former
+  journal-file keys (`size_of_journal_file`, `store_otlp_json`, and
+  similar) stop the current plugin at startup, so every example that
+  used them (including in `netdata-config-from-requirements`) is
+  rewritten. Raw-payload inspection now points at a Collector `debug`
+  exporter.
 
 - `scripts/generate-troubleshoot-skills.py` now reads each tech's
   Netdata collector `metadata.yaml` (via a `PLAYBOOK_TO_COLLECTOR`

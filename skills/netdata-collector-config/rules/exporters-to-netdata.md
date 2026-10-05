@@ -30,6 +30,16 @@ Key points:
   restarts. The defaults are too conservative; the numbers above
   handle a 5-minute Netdata outage without losing data.
 
+
+## Signals
+
+One `otlp/netdata` exporter serves every pipeline that lists it:
+`metrics`, `logs`, and `traces`. Netdata receives all three on the same
+gRPC port. Add the exporter to a `traces` pipeline only when the target
+Agent accepts traces (nightly after 2026-08-17, or the first stable
+release after v2.11.1). A stable v2.11.x Agent rejects every trace
+export; the Collector logs the failure and drops the spans.
+
 ## TLS-enabled
 
 ```yaml

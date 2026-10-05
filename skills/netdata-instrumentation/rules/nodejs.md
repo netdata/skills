@@ -66,6 +66,7 @@ export OTEL_SERVICE_NAME=checkout
 export OTEL_RESOURCE_ATTRIBUTES=service.version=1.4.0,deployment.environment=production
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://netdata.example.internal:4317
 export OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+export OTEL_TRACES_EXPORTER=otlp   # "none" if the Agent has no trace receiver
 ```
 
 `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` are picked up by the
@@ -91,8 +92,8 @@ export OTEL_EXPORTER_OTLP_ENDPOINT=http://netdata.example.internal:4317
 `@opentelemetry/auto-instrumentations-node` turns on the
 instrumentation packages for most common libraries, including `http`,
 `express`, `fastify`, `koa`, `mongodb`, `redis`, `pg`, `mysql2`,
-`@aws-sdk/*`, and `grpc-js`. Each produces spans (not useful to Netdata
-yet) and a small set of metrics (useful to Netdata).
+`@aws-sdk/*`, and `grpc-js`. Each produces spans (exported to Netdata
+when the Agent accepts traces) and a small set of metrics.
 
 If the bundle is too heavy, cherry-pick individual instrumentations
 instead:
@@ -111,11 +112,21 @@ instrumentations: [new HttpInstrumentation(), new ExpressInstrumentation()],
 
 ## Traces
 
-Netdata does not yet accept trace signals. Do not add a span processor
-pointed at Netdata; the connection will succeed and traces will be
-silently dropped. If the service needs distributed tracing in parallel
-with metrics to Netdata, add a second exporter (Tempo, Jaeger, or an
-external vendor) for trace data only.
+The init above passes no `traceExporter`, so `NodeSDK` builds the trace
+exporter from the environment (`@opentelemetry/sdk-node` README,
+"Configure Exporters from environment"). Its default protocol is
+`http/protobuf`; `OTEL_EXPORTER_OTLP_PROTOCOL=grpc` switches spans to
+gRPC on the same endpoint as metrics.
+
+- Agent accepts traces (nightly after 2026-08-17, or the first stable
+  release after v2.11.1): keep `OTEL_TRACES_EXPORTER=otlp`. Spans appear
+  in the Traces tab under the service name.
+- Agent does not accept traces (stable v2.11.x or older): set
+  `OTEL_TRACES_EXPORTER=none`, or point a separate trace exporter at the
+  current trace backend.
+
+See `skills/netdata-otel-setup/rules/trace-ingestion.md` for the version
+check.
 
 ## Logs
 

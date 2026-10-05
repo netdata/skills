@@ -3,84 +3,105 @@
 ## Scope
 
 OTLP/gRPC log ingestion is always on once `otel-plugin` is running. This
-rule covers journal storage, rotation policy, inspection, and a debug flag
-for capturing the full OTLP envelope.
+rule covers the log store used by v2.11.0 and later: storage layout,
+rotation, retention, offloading, and inspection. Traces use a parallel
+store with separate settings; see `trace-ingestion.md`.
 
 ## Storage
 
-Ingested log records are written to systemd-compatible journal files. The
-default directory is:
+Ingested log records are written under `base_dir` (default
+`/var/log/netdata/otel/v2` on Linux packages), in its `logs/` subtree.
+Incoming records are appended to a write-ahead log. When it reaches
+`max_file_size`, `max_entries`, or about 15 minutes of age, it is sealed
+into an indexed file and the write-ahead log is deleted. Every field is
+indexed.
 
-```text
-/var/log/netdata/otel/v1
-```
+Agents before v2.11.0 wrote systemd-compatible journal files under
+`/var/log/netdata/otel/v1` and were configured with `logs.journal_dir`
+and `*_journal_file*` keys. The `*_journal_file*` keys and
+`store_otlp_json` now stop the plugin at startup. The only accepted
+legacy key is `logs.journal_dir`, used solely to locate
+the former plugin's read-only journals.
 
-Override with `logs.journal_dir` in `otel.yaml` only when the default path
-is not writable by the `netdata` user.
+Source: `docs/logs/log-storage-and-retention.md` and
+`src/crates/otel-plugin/integrations/opentelemetry.md` in the Netdata repo.
 
-## Rotation policy
+## Rotation and retention
 
-All knobs are settable in `otel.yaml` under `logs:`. Defaults:
+All knobs live in `otel.yaml` under `logs:`. Defaults:
 
 | Field | Default | What it controls |
 |---|---|---|
-| `size_of_journal_file` | `100MB` | Size cap before rotating to a new file. |
-| `entries_of_journal_file` | `50000` | Entry count cap before rotating. |
-| `duration_of_journal_file` | `2 hours` | Time span cap per file. |
-| `number_of_journal_files` | `10` | Maximum files retained. |
-| `size_of_journal_files` | `1GB` | Total size cap across all files. |
-| `duration_of_journal_files` | `7 days` | Maximum age across all files. |
-| `store_otlp_json` | `false` | Also store the raw OTLP JSON per record. |
+| `logs.rotation.default.max_file_size` | `25MB` | Write-ahead log size that triggers sealing. |
+| `logs.rotation.default.max_entries` | `50000` | Write-ahead log entry count that triggers sealing. |
+| `logs.retention.default.max_files` | `100000` | Maximum retained indexed files. |
+| `logs.retention.default.max_total_size` | `1GB` | Maximum retained indexed-data size. |
+| `logs.retention.default.max_age` | `7 days` | Maximum age of an indexed file, measured on its newest entry. |
 
-Whichever cap is reached first triggers rotation. Whichever retention cap
-is reached first triggers deletion.
+Whichever retention limit is reached first deletes the oldest files.
+`max_total_size` is not a disk cap: active write-ahead logs, catalogs,
+and the remote-read cache are additional.
 
 ## Partial override example
 
 ```yaml
 logs:
-  number_of_journal_files: 20
-  duration_of_journal_files: "14 days"
+  retention:
+    default:
+      max_total_size: "20GB"
+      max_age: "30 days"
 ```
 
-Stock values carry through for any field you omit.
+Stock values carry through for any field you omit. Per-tenant entries
+(keyed by the `X-Scope-OrgID` value when `auth.enabled: true`) inherit
+omitted fields from `default`.
+
+## Offloading to object storage
+
+`remote_storage` is shared by logs and traces. With
+`remote_storage.enabled: true`, every sealed file is also uploaded to
+`remote_storage.uri` (`s3://` or `fs://`), and queries download offloaded
+files into `<base_dir>/remote-read` (bounded by
+`remote_storage.read_cache_max_size`, default `1GB`).
+
+```yaml
+remote_storage:
+  enabled: true
+  uri: "s3://my-bucket/netdata-otel?region=us-east-1"
+  read_cache_max_size: "4GB"
+```
+
+Never put credentials in the URI or in `otel.yaml`. Use the AWS
+environment variables, credentials file, or an instance role available
+to the `netdata` service. The Agent never deletes offloaded files;
+expire them with the object store's lifecycle rules.
 
 ## Inspecting ingested logs
 
-Use `journalctl` with the `-D` flag pointing at the journal dir:
+Open the node's Logs tab, select the `otel-logs` source, and filter with
+the **Services** selector or on a stored field such as
+`resource.attributes.service.name`. The view requires a signed-in
+Netdata Cloud user of the Agent's Space. `service.namespace` and
+`service.name` identify log streams; set them consistently.
 
-```bash
-sudo journalctl -D /var/log/netdata/otel/v1 -f
-```
+The indexed files are not journal files. `journalctl -D` does not read
+them.
 
-Filter by resource attribute. OpenTelemetry resource attributes are
-exposed as journal fields with upper-case names:
+## Seeing the raw OTLP payload
 
-```bash
-sudo journalctl -D /var/log/netdata/otel/v1 \
-  SERVICE_NAME=checkout \
-  --since "5 minutes ago"
-```
-
-The Netdata dashboard's Logs tab reads from the same directory.
-
-## Debugging with `store_otlp_json`
-
-Set to `true` when you need to inspect the exact OTLP payload a producer
-sent, including attributes the mapper dropped.
+The former `store_otlp_json` flag no longer exists. To see exactly what a
+producer sends, route the same data through an OTel Collector with a
+`debug` exporter:
 
 ```yaml
-logs:
-  store_otlp_json: true
+exporters:
+  debug:
+    verbosity: detailed
 ```
 
-Each journal entry then carries the full OTLP log record as a JSON blob in
-a dedicated field. Disk usage increases substantially; turn it off once
-debugging is finished.
+## Trace and span IDs on log records
 
-## What trace-id and span-id look like
-
-If the OTLP log record carries `trace_id` or `span_id`, those fields are
-currently not surfaced as first-class journal fields. The flattener has
-commented-out code for this. Do not build a skill-fed workflow that
-depends on trace/span correlation in logs until a release adds it.
+The log store keeps a record's `trace_id` as a per-record column, not as
+a filterable facet (`src/crates/ng-flatten/src/lib.rs` tests in the
+Netdata repo). Whether the Logs tab links a log record to its trace in
+the Traces tab is not verified; do not promise log-to-trace navigation.

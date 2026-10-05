@@ -27,14 +27,24 @@
   dashboards tend to be a smaller set than the pre-migration
   stack.
 - **Log queries**: each vendor has a different query syntax.
-  Netdata's Logs tab uses systemd journal queries.
+  Netdata's Logs tab uses field filters (facets) and full-text
+  search, not a query language.
+- **Trace exploration**: Netdata's Traces tab supports trace search,
+  lookup of one trace by ID, the slowest traces, a duration
+  overview, and filters on span name, kind, status, and attributes
+  (`otel-traces` Function, Netdata repo
+  `src/crates/otel-ledger/src/ledger/rpc/traces/wire.rs`). Traces are
+  stored on the receiving Agent, not in Netdata Cloud, and need an
+  Agent with trace support (nightly after 2026-08-17, or the first stable release after v2.11.1).
 
 ## Things that do not carry over
 
-- **Trace exploration**: Netdata does not accept traces yet.
-  Route traces to a different backend during the migration
-  window. Plan a second migration for traces when Netdata trace
-  support lands.
+- **APM features beyond trace search** (not verified in Netdata's
+  source or docs): service maps, per-service APM pages, trace-to-log
+  navigation, and vendor-style error tracking. Do not promise them.
+  For request, error, and duration metrics per service, derive them
+  with the Collector's `spanmetrics` connector and send the result to
+  Netdata as metrics.
 - **RUM and Synthetics**: outside Netdata's scope. Keep or replace
   independently.
 - **Vendor-specific AI/ML features** (Watchdog, Davis,

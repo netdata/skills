@@ -41,8 +41,10 @@ jobs:
           PROMPT=$(cat <<EOF
           Review this pull request. Focus on changes to Netdata config
           (otel.yaml, otel.d/), OpenTelemetry instrumentation, or OTel
-          Collector config. Flag any claims about Netdata trace support;
-          Netdata does not accept traces yet. Flag any mapping files or
+          Collector config. Flag any claim that Netdata accepts traces
+          without the version caveat: only Agents built after 2026-08-17
+          (nightly) or the first stable release after v2.11.1 accept
+          them; stable v2.11.x does not. Flag any mapping files or
           instrumentation code that reference _nd_chart_instance or
           _nd_dimension as producer-side attributes; those are not valid.
           _nd_chart_instance does not exist in Netdata. _nd_dimension

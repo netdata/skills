@@ -40,6 +40,12 @@ service:
       receivers: [otlp]
       processors: [memory_limiter, batch]
       exporters: [otlphttp/dynatrace, otlp/netdata]
+    # Only when the Netdata Agent accepts traces
+    # (nightly after 2026-08-17, or the first stable release after v2.11.1).
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/dynatrace, otlp/netdata]
 ```
 
 ## Attribute mapping
@@ -65,6 +71,9 @@ cover with separate tools:
 | Process list with auto-discovery | Netdata's `apps.plugin` (native, always on). |
 | Log ingestion | `filelog` receiver on the Collector, or OTel SDK logs. |
 | Trace auto-instrumentation | OTel Operator `Instrumentation` CRD for zero-code inject, or language-specific SDKs. |
+
+Spans from either path land in Netdata's Traces tab when the Agent
+accepts traces.
 
 Note: if you are removing OneAgent from a host and adding a
 Netdata Agent, many of these signals are collected by Netdata

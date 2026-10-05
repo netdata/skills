@@ -23,12 +23,18 @@ wants Netdata to see, even if the document mentions it in passing.
 - Container platform (Docker, Kubernetes distribution, ECS, Nomad).
 - Existing observability tooling (Datadog, New Relic, Dynatrace,
   Prometheus, Grafana, Tempo, Jaeger).
+- Signals in scope: metrics, logs, traces. Traces need a Netdata Agent
+  built after 2026-08-17 (nightly) or the first stable release after
+  v2.11.1. Record the Agent version (or whether the customer can run
+  nightly builds) next to any trace requirement.
 
 ### 2. Volume estimates
 
 How much telemetry the customer expects.
 
 - Metric rate per host or per cluster (data points per second).
+- Log and span volume per day, if logs or traces are in scope. It sizes
+  `logs.retention` and `traces.retention` (stock: 1GB or 7 days).
 - Number of services in scope.
 - Peak vs average request rate if mentioned.
 - Cardinality hotspots the customer already knows about (for example

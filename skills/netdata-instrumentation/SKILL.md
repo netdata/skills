@@ -1,6 +1,6 @@
 ---
 name: netdata-instrumentation
-description: Use when adding OpenTelemetry instrumentation to application code that will report to Netdata. Covers SDK setup, resource attributes, auto-instrumentation, and patterns for Node.js, Python, Java, Go, .NET, Ruby, and PHP. Emits metrics and logs via OTLP gRPC to Netdata. Traces are not yet supported by Netdata; use an alternative trace backend until Q2 2026.
+description: Use when adding OpenTelemetry instrumentation to application code that will report to Netdata. Covers SDK setup, resource attributes, auto-instrumentation, and patterns for Node.js, Python, Java, Go, .NET, Ruby, and PHP. Emits metrics, logs, and traces via OTLP gRPC to Netdata. Traces need a Netdata Agent built after 2026-08-17 (nightly) or the first stable release after v2.11.1; stable v2.11.x does not accept them.
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -17,13 +17,14 @@ tags:
   - dotnet
   - ruby
   - php
+  - traces
 ---
 
 # Netdata instrumentation
 
 This skill adds OpenTelemetry instrumentation to application code that
-will export metrics (and, where the SDK is mature enough, logs) to
-Netdata over OTLP/gRPC.
+will export metrics, traces, and (where the SDK is mature enough) logs
+to Netdata over OTLP/gRPC.
 
 ## When to use this skill
 
@@ -38,10 +39,18 @@ Netdata over OTLP/gRPC.
 ## Key facts
 
 - Export protocol: OTLP/gRPC on the Netdata OTLP port (default 4317).
-- Signals: metrics and logs are accepted. Traces are not yet accepted by
-  Netdata (planned Q2 2026). If the service only needs traces, send them
-  to Jaeger, Tempo, or an external vendor; do not configure a trace
-  exporter pointed at Netdata.
+- Signals: metrics, logs, and traces are accepted on the same port.
+  Traces need a Netdata Agent built from `master` after 2026-08-17
+  (nightly) or the first stable release after v2.11.1. Stable v2.11.x
+  has no trace receiver. Check the target Agent first (see
+  `skills/netdata-otel-setup/rules/trace-ingestion.md`):
+  - Agent accepts traces: `OTEL_TRACES_EXPORTER=otlp`, pointed at
+    Netdata like the other signals.
+  - Agent does not accept traces: `OTEL_TRACES_EXPORTER=none`, or a
+    separate trace exporter to the current trace backend.
+- Spans are explored in the Netdata Traces tab, grouped by
+  `service.name`. Viewing requires a signed-in Netdata Cloud user of
+  the Agent's Space.
 - Resource attributes that matter:
   - `service.name` (required by OTel). Netdata groups charts by this.
   - `service.version`. Used in dashboards and alert rules.
@@ -61,6 +70,8 @@ Netdata over OTLP/gRPC.
   - `OTEL_RESOURCE_ATTRIBUTES` (comma-separated key=value list)
   - `OTEL_EXPORTER_OTLP_PROTOCOL=grpc` (be explicit; some SDKs default
     to `http/protobuf`)
+  - `OTEL_METRICS_EXPORTER`, `OTEL_TRACES_EXPORTER`,
+    `OTEL_LOGS_EXPORTER` (`otlp` or `none` per signal)
 
 ## Step-by-step
 
@@ -75,7 +86,8 @@ Netdata over OTLP/gRPC.
    the URL; that is the OTLP/HTTP path and the gRPC exporter does not
    want it.
 5. Deploy. Generate some traffic. Verify metrics arrived (see
-   [Verification](#verification)).
+   [Verification](#verification)). If traces are enabled, open the
+   Traces tab and look for the service name.
 6. If metrics render in Netdata with unhelpful dimension names, add a
    mapping file. See `skills/netdata-otel-setup/rules/metric-mapping.md`.
 
@@ -90,8 +102,14 @@ Netdata over OTLP/gRPC.
   Collector to Netdata. Double export doubles the sample count.
 - Calling `shutdown()` in the wrong place. Async SDKs need a chance to
   flush on SIGTERM; a blind `process.exit(0)` loses the last batch.
-- Enabling trace exporting against Netdata. The gRPC connection will
-  succeed but the traces are silently dropped.
+- Enabling trace exporting against a stable v2.11.x (or older) Agent.
+  It has no trace receiver; every span export fails. Check trace
+  support first.
+- Leaving `OTEL_TRACES_EXPORTER=none` from an older setup after the
+  Agent gains trace support. No spans reach the Traces tab.
+- Sending spans that started more than 24 hours ago or end more than 10
+  minutes in the future (clock skew, replayed data). Netdata rejects
+  them and reports it through OTLP `partial_success`.
 - Hardcoding the endpoint in source. Use the env var. Let ops move the
   endpoint without a code change.
 
@@ -138,7 +156,9 @@ curl -s 'http://NETDATA_HOST:19999/api/v2/contexts' \
 ```
 
 A non-empty result means at least one metric from the service arrived
-within the last few minutes. For the canonical working instrumentation,
+within the last few minutes. For traces, open the Traces tab on that
+Agent and filter by the service name. For the canonical working
+instrumentation (metrics and logs),
 see [`tests/e2e/sample-apps/`](../../tests/e2e/sample-apps/) in this repo.
 
 ## References

@@ -50,10 +50,18 @@ Netdata.
   - **Operator-managed**: `OpenTelemetryCollector` CRD manages the
     DaemonSet or Deployment. Best when you want declarative
     lifecycle.
-- Netdata accepts metrics and logs. Do not wire trace receivers /
-  processors / exporters for the Netdata pipeline; the exported
-  traces will be silently dropped. Route traces via a second
-  exporter to a trace backend.
+- Netdata accepts metrics, logs, and traces over the same
+  `otlp/netdata` exporter. Traces need a Netdata Agent built from
+  `master` after 2026-08-17 (nightly) or the first stable release
+  after v2.11.1; stable v2.11.x has no trace receiver. Check the
+  target Agent before adding a `traces` pipeline (see the otel-setup
+  skill, `rules/trace-ingestion.md`). Against an Agent without trace
+  support, keep traces on their current backend.
+- Traces are stored and queried on the Agent that receives the OTLP
+  export. Point the `traces` pipeline at the Agent (usually a Parent)
+  where users will open the Traces tab. Whether received traces
+  replicate to a Parent through Netdata streaming is not documented;
+  do not assume they do.
 - Chart shape on the Netdata side is controlled by **mapping
   files** on the Netdata host, not by annotations the Collector
   adds. To pick the dimension name, set an attribute on the
@@ -70,7 +78,9 @@ Netdata.
      `hostmetrics` or `filelog`),
    - a small processor chain (`memory_limiter`, `batch`, optional
      `resource`),
-   - a single `otlp` exporter pointing at Netdata.
+   - a single `otlp` exporter pointing at Netdata, used by the
+     `metrics`, `logs`, and (when the Agent supports them) `traces`
+     pipelines.
 3. Deploy the Collector.
 4. Point producers at the Collector's OTLP port (default 4317).
 5. Verify data arrives at Netdata using the MCP integration skill.
@@ -79,8 +89,12 @@ Netdata.
 
 - Enabling the Collector's default `otlphttp` exporter. Netdata
   accepts gRPC only.
-- Enabling trace pipelines against Netdata. Remove them; route
-  traces elsewhere.
+- Adding a `traces` pipeline against a stable v2.11.x Agent. It has
+  no trace receiver, so every trace export fails and the Collector
+  drops the spans. Check trace support first.
+- Sampling traces in the DaemonSet tier. `tail_sampling` needs every
+  span of a trace on one Collector; run it on a gateway behind a
+  trace-ID-aware load balancer.
 - Not setting `memory_limiter` before `batch`. Under pressure the
   Collector OOMs; `memory_limiter` is the circuit breaker.
 - Sending `hostmetrics` without a matching mapping file on

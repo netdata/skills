@@ -77,9 +77,34 @@ worker process, not just the web process. The simplest fix is
 
 ## Traces
 
-Netdata does not accept traces yet. Ruby's OTel SDK configures the
-trace exporter via the same env vars; set `OTEL_TRACES_EXPORTER=none`
-to avoid pointing a trace stream at Netdata.
+Ruby's default OTLP trace exporter (`opentelemetry-exporter-otlp`, used
+when `OTEL_TRACES_EXPORTER=otlp`) speaks OTLP/HTTP only, which Netdata
+does not accept. Use the gRPC exporter gem explicitly:
+
+```bash
+gem install opentelemetry-exporter-otlp-grpc
+```
+
+```ruby
+require "opentelemetry/exporter/otlp/grpc"
+
+OpenTelemetry::SDK.configure do |c|
+  # ...service_name, resource, use_all as above...
+  c.add_span_processor(
+    OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(
+      OpenTelemetry::Exporter::OTLP::GRPC::TraceExporter.new(
+        endpoint: ENV.fetch("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
+      )
+    )
+  )
+end
+```
+
+Source: `exporter/otlp-grpc/README.md` in `opentelemetry-ruby`. Add
+this only when the Agent accepts traces (nightly after 2026-08-17, or
+the first stable release after v2.11.1). Otherwise set
+`OTEL_TRACES_EXPORTER=none` so the SDK does not start an HTTP trace
+exporter. Spans appear in the Traces tab under the service name.
 
 ## Verification
 

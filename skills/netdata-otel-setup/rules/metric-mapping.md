@@ -74,20 +74,18 @@ dimensions of the same chart.
 ## How to choose `dimension_attribute_key`
 
 The value must be an attribute that the OTLP producer is already setting on
-the data point. Inspect one payload first. The quickest way is to enable
-raw OTLP capture on logs temporarily:
+the data point. Inspect one payload first. The plugin has no raw-payload
+capture (the former `store_otlp_json` flag was removed in v2.11.0), so
+send the same data through an OTel Collector with a `debug` exporter:
 
 ```yaml
-# otel.yaml
-logs:
-  store_otlp_json: true
+exporters:
+  debug:
+    verbosity: detailed
 ```
 
-Send one metric, then read a recent journal entry:
-
-```bash
-sudo journalctl -D /var/log/netdata/otel/v1 -n 1 --output=json | jq
-```
+The Collector's own log then prints every data point with its attributes
+and instrumentation scope.
 
 Pick an attribute whose cardinality matches how you want the chart split.
 

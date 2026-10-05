@@ -20,6 +20,13 @@ Receiver side (owned by `netdata-otel-setup`):
   `rules/tls-and-auth.md` → inline in `netdata/otel.yaml`.
 - **Log ingestion** (customer names logs in scope) →
   `rules/log-ingestion.md` → inline in `netdata/otel.yaml`.
+- **Trace ingestion** (customer names traces, APM, or distributed
+  tracing in scope) → `rules/trace-ingestion.md` → inline in
+  `netdata/otel.yaml`, plus a `traces` pipeline in
+  `collector/collector-config.yaml`. Traces need a Netdata Agent built
+  after 2026-08-17 (nightly) or the first stable release after
+  v2.11.1; when the customer's Agent version is unknown, raise it as
+  an open question.
 - **Cloud claim** (customer targets Netdata Cloud) →
   `rules/enable-otlp-receiver.md` → `netdata/claim.sh`.
 
@@ -57,11 +64,13 @@ rule. The rule owns the truth; the bundle references it.
 ```yaml
 # otel.yaml
 # OTLP gRPC log ingestion is always on once otel-plugin is running.
-# Ingested records are written to systemd-compatible journal files
-# at /var/log/netdata/otel/v1. Rotation knobs live under logs:.
+# Ingested records are indexed under /var/log/netdata/otel/v2.
+# Retention knobs live under logs.retention.default.
 # ... three more paragraphs ...
 logs:
-  number_of_journal_files: 10
+  retention:
+    default:
+      max_total_size: "10GB"
 ```
 
 **Correct** (points at the authoritative rule, keeps the config
@@ -72,7 +81,9 @@ minimal):
 # Log ingestion path and rotation documented in
 # https://github.com/netdata/skills/blob/main/skills/netdata-otel-setup/rules/log-ingestion.md
 logs:
-  number_of_journal_files: 10
+  retention:
+    default:
+      max_total_size: "10GB"
 ```
 
 ### Rule 2: the sibling's examples are the bundle's seed

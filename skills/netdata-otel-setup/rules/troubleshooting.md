@@ -21,7 +21,10 @@
    ```
 
    If unbound, the plugin crashed during init. Look for "address already
-   in use", "permission denied", or an invalid bind string in the journal.
+   in use", "permission denied", an invalid bind string, or a strict
+   `otel.yaml` parsing error in the journal. Keys from the v2.10 schema
+   (`size_of_journal_file`, `store_otlp_json`, and similar) are a common cause
+   after an upgrade.
 
 3. **Is the client hitting the right host and protocol?**
 
@@ -32,27 +35,24 @@
    grpcurl -plaintext -d '{}' <HOST>:4317 list
    ```
 
-   A `Unimplemented` or method-specific response confirms gRPC is alive.
-   `Connection refused` means the port is not open from where you are.
+   The plugin does not enable server reflection, so `list` returns an
+   error rather than service names; any gRPC error still confirms gRPC is
+   alive. `Connection refused` means the port is not open from where you
+   are.
 
 4. **Does anything arrive?**
 
-   Turn on raw OTLP capture on logs (temporarily):
-
-   ```yaml
-   logs:
-     store_otlp_json: true
-   ```
-
-   Send one request. Read the journal:
+   Read the plugin's own log lines. Rejected exports (bad timestamps,
+   strict-parsing errors, chart budget overruns) are logged there:
 
    ```bash
-   sudo journalctl -D /var/log/netdata/otel/v1 -n 5 --output=json
+   sudo journalctl SYSLOG_IDENTIFIER=otel-plugin \
+     SYSLOG_IDENTIFIER=otel-plugin/ingestor --since "-10 min"
    ```
 
-   If nothing appears, the request did not reach the plugin at all (it
-   was rejected at the network layer or the client had a different
-   endpoint).
+   To see the exact payload a producer sends, route it through an OTel
+   Collector with a `debug` exporter (`verbosity: detailed`). The plugin
+   has no raw-payload capture since v2.11.0.
 
 5. **Does the metric render?**
 
@@ -90,6 +90,24 @@ producer's actual emit cadence. If your producer emits every 30s but the
 network is lossy, bump grace. If your producer's interval is 60s+, set
 `interval_secs` per metric to match.
 
+### "Spans are missing from the Traces tab"
+
+Usually one of:
+
+- The Agent has no trace receiver. Stable v2.11.x and older do not
+  accept traces; see `trace-ingestion.md` for the version check.
+- The SDK uses OTLP/HTTP. Set `OTEL_EXPORTER_OTLP_PROTOCOL=grpc` and
+  port 4317.
+- The SDK trace exporter is still `none`
+  (`OTEL_TRACES_EXPORTER=none`), a leftover from before trace support.
+- The spans fall outside the accepted window: started more than 24 hours
+  ago or end more than 10 minutes in the future. The Agent journal logs a
+  warning for rejected spans.
+- `auth.enabled: true` and the viewer is looking at the `default` tenant
+  while the sender set a different `X-Scope-OrgID`.
+- The viewer is not signed in to Netdata Cloud. The Traces tab requires
+  a signed-in user of the Agent's Space.
+
 ### "TLS handshake fails"
 
 Three likely causes:
@@ -109,8 +127,12 @@ also be set. Setting the CA alone does nothing.
 The prefix is case-sensitive and the value must not be empty. Check:
 
 ```bash
-sudo systemctl show netdata | grep NETDATA_OTEL
+sudo systemctl show netdata | grep NETDATA_OTEL_CFG
 ```
+
+On v2.11.0+ the prefix is `NETDATA_OTEL_CFG_`; the older `NETDATA_OTEL_`
+names are not read. An unknown `NETDATA_OTEL_CFG_*` variable stops the
+plugin.
 
 If not listed, `systemctl set-environment` was run in a different
 context, or the systemd unit drops environment.
