@@ -37,7 +37,8 @@ reading this skill's source.
 
 Sections:
 1. What this bundle contains.
-2. Application order: which file first, which next.
+2. Application order: which file first, which next. The receiver-format
+   check (see `netdata/otel.yaml` below) comes first.
 3. Placeholders in the bundle and where to fill them
    (`<NETDATA_HOST>`, `<BEARER_TOKEN>`, `<CERT_PATH>`).
 4. Link to the account team contact for open questions.
@@ -61,6 +62,24 @@ The receiver config. Derived by delegating to
 [`netdata-otel-setup`](../../netdata-otel-setup/). Comments in the file
 cite the specific rule file for each non-default setting, so the
 customer's platform team can verify the skill did not invent a knob.
+
+The listener block uses the `receivers:` format. This skill cannot read
+the customer's Agent, so the platform team runs the receiver-format
+check on the Agent's stock `otel.yaml` before applying the file:
+
+```bash
+grep -E '^(receivers|endpoint):' /usr/lib/netdata/conf.d/otel.yaml \
+  /opt/netdata/usr/lib/netdata/conf.d/otel.yaml 2>/dev/null
+# Docker: docker exec netdata grep -E '^(receivers|endpoint):' \
+#   /usr/lib/netdata/conf.d/otel.yaml
+```
+
+With only `endpoint:`, the Agent has no OTLP/HTTP listener: the gRPC
+listener moves under `endpoint:` (example in
+`netdata-otel-setup/rules/enable-otlp-receiver.md`, linked by absolute
+URL), and every sender in the bundle uses gRPC on port 4317. When a
+sender in the bundle relies on OTLP/HTTP, list the check's result as an
+open question.
 
 Example comment style:
 
@@ -160,9 +179,11 @@ relevant snippet):
 See https://github.com/netdata/skills/blob/main/skills/netdata-otel-setup/rules/tls-and-auth.md
 for TLS options. The knobs most relevant to this bundle:
 
-- `endpoint.tls_cert_path`
-- `endpoint.tls_key_path`
-- `endpoint.tls_ca_cert_path`
+- `receivers.otlp.protocols.grpc.tls.cert_file`
+- `receivers.otlp.protocols.grpc.tls.key_file`
+- `receivers.otlp.protocols.grpc.tls.client_ca_file`
+- the same keys under `receivers.otlp.protocols.http.tls` when the
+  bundle turns on the OTLP/HTTP listener
 ```
 
 ## Naming

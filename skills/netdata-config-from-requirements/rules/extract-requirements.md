@@ -151,22 +151,30 @@ Every gap becomes a row in `open-questions.md` with three fields:
 
 ```yaml
 # otel.yaml
-endpoint:
-  path: "0.0.0.0:4317"
-  tls_cert_path: "/etc/netdata/tls/cert.pem"  # assumed TLS on
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "0.0.0.0:4317"
+        tls:
+          cert_file: "/etc/netdata/tls/cert.pem"  # assumed TLS on
 ```
 
 **Correct** (explicit pointer to the open question):
 
 ```yaml
 # otel.yaml
-endpoint:
-  path: "0.0.0.0:4317"
-  # TLS: customer did not specify. See open-questions.md Q-03.
-  # Defaulting to TLS off; uncomment and provide cert paths when
-  # Q-03 is answered.
-  # tls_cert_path: "/etc/netdata/tls/cert.pem"
-  # tls_key_path: "/etc/netdata/tls/key.pem"
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "0.0.0.0:4317"
+        # TLS: customer did not specify. See open-questions.md Q-03.
+        # Defaulting to TLS off; uncomment and provide cert paths when
+        # Q-03 is answered.
+        # tls:
+        #   cert_file: "/etc/netdata/tls/cert.pem"
+        #   key_file: "/etc/netdata/tls/key.pem"
 ```
 
 ## Document-format handling

@@ -63,7 +63,7 @@ rule. The rule owns the truth; the bundle references it.
 
 ```yaml
 # otel.yaml
-# OTLP gRPC log ingestion is always on once otel-plugin is running.
+# OTLP log ingestion is always on once otel-plugin is running.
 # Ingested records are indexed under /var/log/netdata/otel/v2.
 # Retention knobs live under logs.retention.default.
 # ... three more paragraphs ...

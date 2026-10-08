@@ -30,14 +30,19 @@ the Agent is upgraded.
 
 ## How spans arrive
 
-Traces use the same OTLP/gRPC endpoint as metrics and logs
-(`endpoint.path`, default `127.0.0.1:4317`). OTLP/HTTP is not accepted.
+Traces use the same listeners as metrics and logs: OTLP/gRPC on
+`127.0.0.1:4317`, and OTLP/HTTP on `127.0.0.1:4318` (path `/v1/traces`)
+once `receivers.otlp.protocols.http.enabled: true`.
 
-- **SDK:** set `OTEL_TRACES_EXPORTER=otlp`,
-  `OTEL_EXPORTER_OTLP_PROTOCOL=grpc`, and
-  `OTEL_EXPORTER_OTLP_ENDPOINT=http://NETDATA_HOST:4317`.
-- **Collector:** add the Netdata `otlp` exporter to a `traces` pipeline.
-  See `skills/netdata-collector-config/rules/exporters-to-netdata.md`.
+- **SDK:** set `OTEL_TRACES_EXPORTER=otlp`, then either
+  `OTEL_EXPORTER_OTLP_PROTOCOL=grpc` with
+  `OTEL_EXPORTER_OTLP_ENDPOINT=http://NETDATA_HOST:4317`, or
+  `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf` with
+  `OTEL_EXPORTER_OTLP_ENDPOINT=http://NETDATA_HOST:4318`. HTTP exporters
+  append `/v1/traces` to that base endpoint.
+- **Collector:** add the Netdata `otlp` (gRPC) or `otlphttp` exporter to a
+  `traces` pipeline. See
+  `skills/netdata-collector-config/rules/exporters-to-netdata.md`.
 
 Set the `service.name` resource attribute in every application. It names
 the service each span belongs to.
@@ -105,11 +110,11 @@ warning in the Agent journal. Check the sender's clock first.
 
 ## Tenants
 
-With `auth.enabled: true`, senders must set the `X-Scope-OrgID` gRPC
-header, and per-tenant retention entries are keyed by its value. This
-is tenant selection, not authentication; trust it only behind TLS or
-mTLS. With `auth.enabled: false`, all traces belong to the `default`
-tenant.
+With `auth.enabled: true`, senders must set the `X-Scope-OrgID` header
+(gRPC metadata or HTTP header), and per-tenant retention entries are
+keyed by its value. This is tenant selection, not authentication; trust
+it only behind TLS or mTLS. With `auth.enabled: false`, all traces
+belong to the `default` tenant.
 
 ## Exploring traces
 

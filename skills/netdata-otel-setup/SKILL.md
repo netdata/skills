@@ -1,6 +1,6 @@
 ---
 name: netdata-otel-setup
-description: Use when enabling the Netdata otel.plugin, writing /etc/netdata/otel.yaml, defining metric-to-chart mappings, configuring TLS on the OTLP receiver, setting log or trace retention, or debugging OTLP ingestion issues with Netdata. Covers OTLP gRPC ingestion for metrics (v2.7.0+), logs (v2.9.0+, current storage schema v2.11.0+), and traces (nightly builds after v2.11.1; not in stable v2.11.x).
+description: Use when enabling the Netdata otel.plugin, writing /etc/netdata/otel.yaml, defining metric-to-chart mappings, configuring TLS on the OTLP receiver, setting log or trace retention, or debugging OTLP ingestion issues with Netdata. Covers OTLP gRPC and HTTP ingestion for metrics (v2.7.0+), logs (v2.9.0+, current storage schema v2.11.0+), and traces (nightly builds after v2.11.1; not in stable v2.11.x).
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -18,7 +18,8 @@ tags:
 # Netdata OTel setup
 
 This skill configures Netdata's built-in `otel.plugin` to receive OpenTelemetry
-data from collectors, SDKs, or instrumented applications over OTLP/gRPC.
+data from collectors, SDKs, or instrumented applications over OTLP/gRPC or
+OTLP/HTTP.
 
 ## When to use this skill
 
@@ -36,10 +37,22 @@ data from collectors, SDKs, or instrumented applications over OTLP/gRPC.
 
 - Plugin: `otel-plugin` binary (Rust); `otel.plugin` is the logical integration id on the dashboard.
 - Platform support: Linux and macOS. Windows and FreeBSD are not supported.
-- Transport: **OTLP/gRPC only** on the configured endpoint. OTLP/HTTP
-  (port 4318) is not accepted, for any signal.
-- Default endpoint: `127.0.0.1:4317`. Bind to `0.0.0.0:4317` to accept remote
-  traffic. Configurable via `endpoint.path`.
+- Transport: OTLP over gRPC (port 4317, on by default) or HTTP (port 4318,
+  once `receivers.otlp.protocols.http.enabled: true`). Both listen on
+  `127.0.0.1` by default and accept metrics, logs, and traces. OTLP/HTTP
+  serves `/v1/metrics`, `/v1/logs`, and `/v1/traces`.
+- Listeners: `receivers.otlp.protocols.grpc` and `.http`, each with its own
+  `enabled`, `endpoint`, and `tls` (`cert_file`, `key_file`,
+  `client_ca_file`). Bind to `0.0.0.0` to accept remote traffic. At least
+  one listener must stay enabled.
+- Older files set the gRPC listener in an `endpoint:` section (`path`,
+  `tls_cert_path`, `tls_key_path`, `tls_ca_cert_path`). Those names still
+  work and log a deprecation warning; a value under `receivers:` wins when
+  a file sets both.
+- Receiver-format check: an Agent whose stock `otel.yaml` has only an
+  `endpoint:` section has no OTLP/HTTP listener, and its plugin stops at
+  startup on a `receivers:` section. There, configure gRPC under
+  `endpoint:` and send gRPC to port 4317. Step 3 runs the check.
 - Signals accepted, by Agent version:
   - Metrics: v2.7.0 and later.
   - Logs: v2.9.0 and later. v2.11.0 replaced the journal-file store with an
@@ -59,8 +72,9 @@ data from collectors, SDKs, or instrumented applications over OTLP/gRPC.
   `logs.journal_dir` is still accepted, only to locate the former
   plugin's read-only journals.
 - Env-var overrides: `NETDATA_OTEL_CFG_` plus the option path in uppercase
-  with dots replaced by underscores. Example: `endpoint.tls_cert_path`
-  becomes `NETDATA_OTEL_CFG_ENDPOINT_TLS_CERT_PATH`. For `default`
+  with dots replaced by underscores. Example:
+  `receivers.otlp.protocols.http.enabled` becomes
+  `NETDATA_OTEL_CFG_RECEIVERS_OTLP_PROTOCOLS_HTTP_ENABLED`. For `default`
   rotation and retention entries, drop the `default` segment:
   `traces.retention.default.max_age` becomes
   `NETDATA_OTEL_CFG_TRACES_RETENTION_MAX_AGE`. Env vars have the highest
@@ -106,12 +120,32 @@ data from collectors, SDKs, or instrumented applications over OTLP/gRPC.
    sudo ./edit-config otel.yaml
    ```
 
-3. Set the endpoint. For local-only traffic, leave the default. For remote
-   OTLP clients, bind on `0.0.0.0` and protect the port (TLS, firewall).
+3. Check the receiver format, then set the listeners. Read the Agent's
+   stock `otel.yaml`, not the user copy:
+
+   ```bash
+   grep -E '^(receivers|endpoint):' /usr/lib/netdata/conf.d/otel.yaml \
+     /opt/netdata/usr/lib/netdata/conf.d/otel.yaml 2>/dev/null
+   # Docker: docker exec netdata grep -E '^(receivers|endpoint):' \
+   #   /usr/lib/netdata/conf.d/otel.yaml
+   ```
+
+   Only `endpoint:` means the Agent has no OTLP/HTTP listener: configure
+   gRPC under `endpoint:` and send gRPC to port 4317 (example in
+   [`rules/enable-otlp-receiver.md`](./rules/enable-otlp-receiver.md)).
+   With `receivers:`, leave the defaults for local-only gRPC traffic, turn
+   on the OTLP/HTTP listener when senders use OTLP/HTTP, and for remote
+   OTLP clients bind on `0.0.0.0` and protect each port (TLS, firewall).
 
    ```yaml
-   endpoint:
-     path: "0.0.0.0:4317"
+   receivers:
+     otlp:
+       protocols:
+         grpc:
+           endpoint: "0.0.0.0:4317"
+         http:
+           enabled: true
+           endpoint: "0.0.0.0:4318"
    ```
 
 4. Logs and traces ingestion are always on. Change retention only when the
@@ -143,8 +177,8 @@ data from collectors, SDKs, or instrumented applications over OTLP/gRPC.
 6. Confirm the plugin is listening.
 
    ```bash
-   ss -tlnp | grep 4317
-   # Expect a listener on the address you configured.
+   ss -tlnp | grep -E '4317|4318'
+   # Expect one listener per enabled protocol, on the address you configured.
    ```
 
 7. Send a test metric from an OTLP client and watch it appear on the
@@ -157,9 +191,10 @@ data from collectors, SDKs, or instrumented applications over OTLP/gRPC.
 
 ## Common mistakes
 
-- Pointing an OTLP/HTTP client at the Netdata endpoint. The plugin does not
-  accept OTLP/HTTP. Use gRPC. Many SDKs default to `http/protobuf`; set
-  `OTEL_EXPORTER_OTLP_PROTOCOL=grpc`.
+- Pointing an OTLP/HTTP client at an Agent whose OTLP/HTTP listener is off
+  (the default). Many SDKs default to `http/protobuf`: turn the listener on
+  and send to port 4318, or set `OTEL_EXPORTER_OTLP_PROTOCOL=grpc` and send
+  to port 4317. A protocol sent to the other protocol's port fails.
 - Sending traces to a stable v2.11.x Agent. It has no trace receiver.
   Check for trace support first (step 1).
 - Copying an `otel.yaml` written for v2.10 or earlier. Keys such as
@@ -171,7 +206,8 @@ data from collectors, SDKs, or instrumented applications over OTLP/gRPC.
 - Treating `retention.*.max_total_size` as a disk cap. Write-ahead logs,
   catalogs, and the remote-read cache are additional.
 - Binding to `0.0.0.0` without also considering firewall rules. A public
-  `4317` is a denial-of-service target. Gate it at the host firewall.
+  `4317` or `4318` is a denial-of-service target. Gate it at the host
+  firewall.
 - Editing `otel.yaml` directly inside `/usr/lib/netdata` or similar stock
   paths. Stock configs get overwritten on upgrade. Always use the
   user-level config directory via `edit-config`.
@@ -238,5 +274,6 @@ repo.
 - Netdata source: `src/crates/otel-plugin/integrations/opentelemetry.md`
   and `src/crates/otel-plugin/configs/otel.yaml.in` in the Netdata repo.
 - Netdata docs: `docs/opentelemetry/otlp-ingestion.md`,
+  `docs/opentelemetry/securing-the-otlp-endpoint.md`,
   `docs/opentelemetry/trace-storage-and-retention.md`,
   `docs/logs/log-storage-and-retention.md` in the Netdata repo.

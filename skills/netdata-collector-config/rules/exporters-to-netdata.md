@@ -40,6 +40,25 @@ Agent accepts traces (nightly after 2026-08-17, or the first stable
 release after v2.11.1). A stable v2.11.x Agent rejects every trace
 export; the Collector logs the failure and drops the spans.
 
+## OTLP/HTTP
+
+The Agent's OTLP/HTTP listener (port 4318) is off by default. Once the
+Agent sets `receivers.otlp.protocols.http.enabled: true`, the `otlphttp`
+exporter works too:
+
+```yaml
+exporters:
+  otlphttp/netdata:
+    endpoint: http://netdata.example.internal:4318
+    tls:
+      insecure: true
+```
+
+Unlike `otlp`, `otlphttp` takes a full URL with a scheme and appends
+`/v1/metrics`, `/v1/logs`, or `/v1/traces` itself. Use `https://` and a
+`tls` block when the listener has TLS. Source:
+`docs/opentelemetry/otlp-ingestion.md` in the Netdata repo.
+
 ## TLS-enabled
 
 ```yaml
@@ -50,7 +69,8 @@ exporters:
       ca_file: /etc/otelcol/netdata-ca.pem
 ```
 
-For mTLS (Netdata's `tls_ca_cert_path` set), add the client cert:
+For mTLS (Netdata's `tls.client_ca_file` set on the listener), add the
+client cert:
 
 ```yaml
 tls:
@@ -161,13 +181,14 @@ setup, defaults are enough.
 
 ## Common misconfigurations
 
-- Adding `compression: zstd`. Netdata's gRPC server does gzip and
-  identity only.
+- Adding `compression: zstd`. Netdata's OTLP receiver accepts gzip
+  and identity only, on both listeners.
 - Setting `timeout: 1s`. Too aggressive; Netdata occasionally
   takes longer to ack large batches during ingestion spikes.
   Default of 10s is fine.
-- Setting `endpoint: http://netdata:4317`. The scheme breaks the
-  Go gRPC dial. Strip it.
+- Setting `endpoint: http://netdata:4317` on the `otlp` exporter. The
+  scheme breaks the Go gRPC dial. Strip it. (`otlphttp` needs the
+  scheme.)
 - Pointing the exporter at Netdata's dashboard port only (19999).
-  Netdata uses 19999 for web/API/MCP and 4317 for OTLP. They are
-  different ports by default.
+  Netdata uses 19999 for web/API/MCP, 4317 for OTLP/gRPC, and 4318
+  for OTLP/HTTP. They are different ports by default.

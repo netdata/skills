@@ -2,10 +2,11 @@
 
 ## Scope
 
-OTLP/gRPC log ingestion is always on once `otel-plugin` is running. This
-rule covers the log store used by v2.11.0 and later: storage layout,
-rotation, retention, offloading, and inspection. Traces use a parallel
-store with separate settings; see `trace-ingestion.md`.
+OTLP log ingestion is always on once `otel-plugin` is running. Logs arrive
+on the gRPC listener and, when it is on, the OTLP/HTTP listener
+(`/v1/logs`). This rule covers the log store used by v2.11.0 and later:
+storage layout, rotation, retention, offloading, and inspection. Traces
+use a parallel store with separate settings; see `trace-ingestion.md`.
 
 ## Storage
 

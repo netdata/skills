@@ -95,7 +95,9 @@ OpenTelemetrySdk sdk = OpenTelemetrySdk.builder()
 With the agent, `otel.traces.exporter=otlp` and
 `otel.exporter.otlp.protocol=grpc` send spans to Netdata on the same
 endpoint as metrics. The agent's default protocol is `http/protobuf`, so
-keep the protocol setting explicit.
+keep the protocol setting explicit for port 4317. With the Agent's
+OTLP/HTTP listener on, the default works too: drop the protocol setting
+and point `otel.exporter.otlp.endpoint` at port 4318.
 
 When the Agent has no trace receiver (stable v2.11.x or older), set
 `otel.traces.exporter=none` (or `OTEL_TRACES_EXPORTER=none`).

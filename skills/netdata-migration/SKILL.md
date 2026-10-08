@@ -18,7 +18,7 @@ tags:
 
 This skill guides a migration from another observability vendor's
 metric pipeline to Netdata. The goal is OpenTelemetry-native
-instrumentation that exports to Netdata over OTLP/gRPC, with
+instrumentation that exports to Netdata over OTLP (gRPC or HTTP), with
 existing dashboards and alerts rebuilt on the Netdata side where
 parity is possible.
 
@@ -33,10 +33,14 @@ parity is possible.
 
 ## Key facts
 
-- Netdata accepts metrics, logs, and traces via OTLP/gRPC. Traces
-  need a Netdata Agent built from `master` after 2026-08-17 (nightly)
-  or the first stable release after v2.11.1. Stable v2.11.x has no
-  trace receiver; on it, keep traces on the old backend until the
+- Netdata accepts metrics, logs, and traces via OTLP/gRPC (port 4317,
+  on by default) or OTLP/HTTP (port 4318, once the Agent sets
+  `receivers.otlp.protocols.http.enabled: true`). If the Agent has no
+  OTLP/HTTP listener (receiver-format check in
+  `skills/netdata-otel-setup/rules/enable-otlp-receiver.md`), use gRPC on
+  4317. Traces need a Netdata Agent built from `master` after 2026-08-17
+  (nightly) or the first stable release after v2.11.1. Stable v2.11.x
+  has no trace receiver; on it, keep traces on the old backend until the
   Agent is upgraded.
 - Netdata's Traces tab covers trace search, lookup by trace ID, the
   slowest traces, a duration overview, and attribute facets. It is
@@ -75,9 +79,10 @@ parity is possible.
 3. Replace the SDK. See the per-vendor rule files in
    [References](#references).
 
-4. Reconfigure the exporter. OTLP/gRPC at the Netdata receiver
-   port (default 4317). Set `service.name`, `service.version`,
-   `deployment.environment` as resource attributes.
+4. Reconfigure the exporter: OTLP/gRPC at port 4317, or OTLP/HTTP
+   at port 4318 with the Agent's OTLP/HTTP listener on. Set
+   `service.name`, `service.version`, `deployment.environment` as
+   resource attributes.
 
 5. Rebuild alerts against Netdata. Prioritize by current alert
    firing frequency; low-volume alerts can wait.

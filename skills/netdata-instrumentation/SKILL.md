@@ -1,6 +1,6 @@
 ---
 name: netdata-instrumentation
-description: Use when adding OpenTelemetry instrumentation to application code that will report to Netdata. Covers SDK setup, resource attributes, auto-instrumentation, and patterns for Node.js, Python, Java, Go, .NET, Ruby, and PHP. Emits metrics, logs, and traces via OTLP gRPC to Netdata. Traces need a Netdata Agent built after 2026-08-17 (nightly) or the first stable release after v2.11.1; stable v2.11.x does not accept them.
+description: Use when adding OpenTelemetry instrumentation to application code that will report to Netdata. Covers SDK setup, resource attributes, auto-instrumentation, and patterns for Node.js, Python, Java, Go, .NET, Ruby, and PHP. Emits metrics, logs, and traces via OTLP gRPC or HTTP to Netdata. Traces need a Netdata Agent built after 2026-08-17 (nightly) or the first stable release after v2.11.1; stable v2.11.x does not accept them.
 version: 0.1.0
 author: Netdata
 license: Apache-2.0
@@ -24,7 +24,7 @@ tags:
 
 This skill adds OpenTelemetry instrumentation to application code that
 will export metrics, traces, and (where the SDK is mature enough) logs
-to Netdata over OTLP/gRPC.
+to Netdata over OTLP/gRPC or OTLP/HTTP.
 
 ## When to use this skill
 
@@ -38,8 +38,15 @@ to Netdata over OTLP/gRPC.
 
 ## Key facts
 
-- Export protocol: OTLP/gRPC on the Netdata OTLP port (default 4317).
-- Signals: metrics, logs, and traces are accepted on the same port.
+- Export protocol: OTLP/gRPC on port 4317 (on by default), or OTLP/HTTP
+  on port 4318 once the Agent sets
+  `receivers.otlp.protocols.http.enabled: true`. Both listen on
+  `127.0.0.1` by default. SDKs that default to `http/protobuf` can send
+  directly once that listener is on, or switch to gRPC. If the Agent has
+  no OTLP/HTTP listener (receiver-format check in
+  `skills/netdata-otel-setup/rules/enable-otlp-receiver.md`), use gRPC on
+  4317.
+- Signals: metrics, logs, and traces are accepted on either listener.
   Traces need a Netdata Agent built from `master` after 2026-08-17
   (nightly) or the first stable release after v2.11.1. Stable v2.11.x
   has no trace receiver. Check the target Agent first (see
@@ -66,10 +73,11 @@ to Netdata over OTLP/gRPC.
 - Environment variables control the exporter without code changes:
   - `OTEL_SERVICE_NAME`
   - `OTEL_EXPORTER_OTLP_ENDPOINT` (scheme + host + port, e.g.
-    `http://netdata.example.internal:4317`)
+    `http://netdata.example.internal:4317` for gRPC or
+    `http://netdata.example.internal:4318` for HTTP)
   - `OTEL_RESOURCE_ATTRIBUTES` (comma-separated key=value list)
-  - `OTEL_EXPORTER_OTLP_PROTOCOL=grpc` (be explicit; some SDKs default
-    to `http/protobuf`)
+  - `OTEL_EXPORTER_OTLP_PROTOCOL`: `grpc` for port 4317, `http/protobuf`
+    for port 4318 (be explicit; SDK defaults differ)
   - `OTEL_METRICS_EXPORTER`, `OTEL_TRACES_EXPORTER`,
     `OTEL_LOGS_EXPORTER` (`otlp` or `none` per signal)
 
@@ -81,10 +89,14 @@ to Netdata over OTLP/gRPC.
    Node.js/Python this is typically a `-r`/`--import` preload; in Java
    it is the Java agent jar; in Go/Ruby/.NET/PHP it is an in-process
    call before the first work happens.
-4. Set the environment variables above. The endpoint must use `http://`
-   (or `https://` with TLS) and port 4317. Do not put `/v1/metrics` on
-   the URL; that is the OTLP/HTTP path and the gRPC exporter does not
-   want it.
+4. Set the environment variables above. The endpoint uses `http://` (or
+   `https://` with TLS) and the port of the chosen protocol. Leave the
+   path off `OTEL_EXPORTER_OTLP_ENDPOINT`: HTTP exporters append
+   `/v1/metrics`, `/v1/logs`, or `/v1/traces` themselves, and the gRPC
+   exporter takes no path. A per-signal variable such as
+   `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` is used as-is, so for HTTP it
+   carries the full path (OpenTelemetry specification,
+   `specification/protocol/exporter.md`).
 5. Deploy. Generate some traffic. Verify metrics arrived (see
    [Verification](#verification)). If traces are enabled, open the
    Traces tab and look for the service name.
@@ -93,8 +105,10 @@ to Netdata over OTLP/gRPC.
 
 ## Common mistakes
 
-- Using the HTTP exporter (`exporter-otlp-http`, port 4318) against
-  Netdata. Netdata accepts gRPC only.
+- Using an HTTP exporter (`http/protobuf`, port 4318) against an Agent
+  whose OTLP/HTTP listener is off (the default). Turn the listener on,
+  or use gRPC on port 4317. Sending one protocol to the other's port
+  fails.
 - Forgetting to set `service.name`. Without it, charts group under an
   "unknown_service" bucket and look broken.
 - Setting both the SDK endpoint and the Collector endpoint to the same
@@ -117,10 +131,10 @@ to Netdata over OTLP/gRPC.
 
 Two deployment shapes:
 
-- **SDK -> Netdata directly**: simplest. The SDK's OTLP gRPC
-  exporter opens a connection to Netdata. Fine for single-service
-  setups or dev environments. The downside is that every service
-  carries its own export config and retry logic.
+- **SDK -> Netdata directly**: simplest. The SDK's OTLP exporter
+  (gRPC, or HTTP with the listener on) sends to Netdata. Fine for
+  single-service setups or dev environments. The downside is that
+  every service carries its own export config and retry logic.
 - **SDK -> Collector -> Netdata**: a local (DaemonSet or sidecar)
   Collector intercepts the SDK's OTLP output, adds enrichment
   (Kubernetes metadata, cluster name, etc.), and forwards to

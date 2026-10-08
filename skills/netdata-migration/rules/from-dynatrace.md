@@ -21,8 +21,9 @@ Add:
 
 Dynatrace accepts OTLP at
 `https://{env-id}.live.dynatrace.com/api/v2/otlp` over HTTP (not
-gRPC). Netdata accepts OTLP gRPC only. During parallel run you
-need the Collector to speak both:
+gRPC). Netdata accepts OTLP over gRPC, or over HTTP once its OTLP/HTTP
+listener is on. During parallel run a Collector fans the same data out
+to both backends:
 
 ```yaml
 exporters:

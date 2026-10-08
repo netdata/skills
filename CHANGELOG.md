@@ -82,6 +82,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- OTLP/HTTP and the current OTLP receiver config format across the
+  Tier 1 skills. Netdata's `otel-plugin` receives OTLP over gRPC
+  (`127.0.0.1:4317`, on by default) or HTTP (`127.0.0.1:4318`, once
+  `receivers.otlp.protocols.http.enabled: true`), with per-listener
+  `enabled`, `endpoint`, and `tls` settings under
+  `receivers.otlp.protocols.grpc` and `.http` (netdata/netdata #24128,
+  `src/crates/otel-plugin/configs/otel.yaml.in`). Every skill statement
+  that Netdata accepts OTLP only over gRPC is corrected, and every
+  receiver example moves off the deprecated `endpoint:` section, which
+  still works and logs a deprecation warning.
+  - Receiver-format check: before writing receiver config, the
+    assistant reads the Agent's stock `otel.yaml` (native packages,
+    static installs under `/opt/netdata`, or inside the Docker
+    container; `edit-config --help` prints the stock directory
+    elsewhere). Only an `endpoint:` section means the Agent has no
+    OTLP/HTTP listener: the gRPC listener goes under `endpoint:` and
+    senders use gRPC on 4317. The check sits where receiver config is
+    written (`netdata-otel-setup` SKILL.md, `enable-otlp-receiver.md`,
+    `tls-and-auth.md`, and the `netdata-config-from-requirements`
+    bundle), with one `endpoint:` example, an "unknown field
+    `receivers`" troubleshooting entry, and one-line gRPC pointers in the
+    instrumentation (including PHP and Ruby), collector-config, and
+    migration skills. Source: `system/edit-config`,
+    `packaging/docker/run.sh`, and
+    `src/crates/otel-plugin/src/config/mod.rs`.
+  - `netdata-otel-setup`: transport and listener facts, `receivers:`
+    examples (stock defaults, minimal override, TLS, mTLS on both
+    listeners), env-var names, `X-Scope-OrgID` as gRPC metadata or
+    HTTP header, protocol and port troubleshooting, per-listener mTLS.
+  - `netdata-instrumentation`: protocol and port pairing for
+    `OTEL_EXPORTER_OTLP_PROTOCOL`, per-signal URL rules, and the Java
+    agent's `http/protobuf` default on port 4318. PHP and Ruby send
+    OTLP/HTTP to Netdata directly, with gRPC as the alternative.
+  - `netdata-collector-config`: the `otlphttp` exporter on port 4318,
+    plus compression and port facts that cover both listeners.
+  - `netdata-migration`: OTLP/HTTP as a target transport; the
+    Dynatrace parallel run no longer cites a gRPC-only receiver.
+  - `netdata-config-from-requirements`: `otel.yaml` examples and TLS
+    option names in the `receivers:` format.
+  - `docs/skill-authoring-guide.md`: example description synced with
+    `netdata-otel-setup`.
+
 - `netdata-otel-setup` now documents the `otel.yaml` schema shipped
   since v2.11.0: `base_dir`, per-signal `rotation` / `retention`,
   shared `remote_storage` and `auth`, strict parsing, the
@@ -131,6 +173,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `netdata-instrumentation/rules/ruby.md`: the Ruby OTLP metrics
+  exporter speaks OTLP/HTTP only, and an explicit `endpoint:` is used
+  as-is, so the init's `http://localhost:4317` sent HTTP to the gRPC
+  port without the `/v1/metrics` path. The init now lets the exporter
+  read `OTEL_EXPORTER_OTLP_ENDPOINT` (port 4318) and append the path.
+- `netdata-instrumentation/rules/php.md`: the manual wiring passed an
+  endpoint without the gRPC method path to `GrpcTransportFactory`,
+  which rejects it, and the install list lacked
+  `open-telemetry/transport-grpc`. The wiring now uses
+  `OtlpHttpTransportFactory`, and the install list adds a PSR-18 HTTP
+  client.
 - Tier 2 skills now name the real Netdata contexts the agent should
   query. Previously the verification block said "list_metrics filtered
   by the <tech> service's context prefix" without naming the prefix;
