@@ -54,8 +54,9 @@ PHP's OTLP exporter defaults to `http/protobuf`. It sends to the Agent's
 OTLP/HTTP listener, which must be on
 (`receivers.otlp.protocols.http.enabled: true`; see the otel-setup
 skill), and appends `/v1/metrics`, `/v1/traces`, or `/v1/logs` to the
-endpoint. For gRPC on port 4317 instead, install the `grpc` extension and
-`open-telemetry/transport-grpc`, then set
+endpoint. If the Agent has no OTLP/HTTP listener (receiver-format check
+in the otel-setup skill), or to use gRPC anyway, install the `grpc`
+extension and `open-telemetry/transport-grpc`, then set
 `OTEL_EXPORTER_OTLP_PROTOCOL=grpc` and the endpoint to port 4317.
 
 ## Manual SDK wiring

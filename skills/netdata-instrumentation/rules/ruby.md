@@ -52,6 +52,11 @@ skill). An explicit `endpoint:` argument is used as-is, so it must carry
 the full `/v1/metrics` URL. Source: `exporter/otlp-metrics` and
 `exporter/otlp-common` in `opentelemetry-ruby`.
 
+If the Agent has no OTLP/HTTP listener (receiver-format check in the
+otel-setup skill), Ruby has no gRPC metrics exporter: send metrics
+through an OTel Collector that exports gRPC to port 4317, and send
+traces with the gRPC exporter below.
+
 ## Environment variables
 
 ```bash

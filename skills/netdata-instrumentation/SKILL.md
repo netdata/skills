@@ -42,7 +42,10 @@ to Netdata over OTLP/gRPC or OTLP/HTTP.
   on port 4318 once the Agent sets
   `receivers.otlp.protocols.http.enabled: true`. Both listen on
   `127.0.0.1` by default. SDKs that default to `http/protobuf` can send
-  directly once that listener is on, or switch to gRPC.
+  directly once that listener is on, or switch to gRPC. If the Agent has
+  no OTLP/HTTP listener (receiver-format check in
+  `skills/netdata-otel-setup/rules/enable-otlp-receiver.md`), use gRPC on
+  4317.
 - Signals: metrics, logs, and traces are accepted on either listener.
   Traces need a Netdata Agent built from `master` after 2026-08-17
   (nightly) or the first stable release after v2.11.1. Stable v2.11.x

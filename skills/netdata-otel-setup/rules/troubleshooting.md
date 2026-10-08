@@ -68,6 +68,16 @@
 
 ## Common symptoms
 
+### "unknown field `receivers`" at startup
+
+The Agent predates the `receivers:` format; its stock `otel.yaml` has
+only an `endpoint:` section (see the check in `enable-otlp-receiver.md`).
+Move the gRPC listener settings under `endpoint:` (`path`,
+`tls_cert_path`, `tls_key_path`, `tls_ca_cert_path`) and send gRPC to
+port 4317; this Agent has no OTLP/HTTP listener. The error
+`unrecognized environment variable: NETDATA_OTEL_CFG_RECEIVERS_...` has
+the same cause: use the `NETDATA_OTEL_CFG_ENDPOINT_*` names.
+
 ### "No charts appear for my metric"
 
 Usually one of:

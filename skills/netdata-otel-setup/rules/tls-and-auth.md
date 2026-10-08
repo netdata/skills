@@ -8,6 +8,21 @@ application-layer auth (no bearer tokens, no basic auth, no API keys on
 the OTLP endpoint). Restricting who can send data means: bind address +
 firewall, or mTLS.
 
+## Check the receiver format first
+
+Before writing TLS settings, read the Agent's stock `otel.yaml` (Docker
+and other installs: see `enable-otlp-receiver.md`):
+
+```bash
+grep -E '^(receivers|endpoint):' /usr/lib/netdata/conf.d/otel.yaml \
+  /opt/netdata/usr/lib/netdata/conf.d/otel.yaml 2>/dev/null
+```
+
+With `receivers:`, use the per-listener examples below. With only
+`endpoint:`, the Agent has a single gRPC listener: set TLS with
+`tls_cert_path`, `tls_key_path`, and `tls_ca_cert_path` (mTLS) under
+`endpoint:`, as in the example in `enable-otlp-receiver.md`.
+
 ## Server-side TLS
 
 Provide a cert and key. TLS turns on for a listener as soon as both of

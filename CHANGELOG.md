@@ -92,6 +92,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that Netdata accepts OTLP only over gRPC is corrected, and every
   receiver example moves off the deprecated `endpoint:` section, which
   still works and logs a deprecation warning.
+  - Receiver-format check: before writing receiver config, the
+    assistant reads the Agent's stock `otel.yaml` (native packages,
+    static installs under `/opt/netdata`, or inside the Docker
+    container; `edit-config --help` prints the stock directory
+    elsewhere). Only an `endpoint:` section means the Agent has no
+    OTLP/HTTP listener: the gRPC listener goes under `endpoint:` and
+    senders use gRPC on 4317. The check sits where receiver config is
+    written (`netdata-otel-setup` SKILL.md, `enable-otlp-receiver.md`,
+    `tls-and-auth.md`, and the `netdata-config-from-requirements`
+    bundle), with one `endpoint:` example, an "unknown field
+    `receivers`" troubleshooting entry, and one-line gRPC pointers in the
+    instrumentation (including PHP and Ruby), collector-config, and
+    migration skills. Source: `system/edit-config`,
+    `packaging/docker/run.sh`, and
+    `src/crates/otel-plugin/src/config/mod.rs`.
   - `netdata-otel-setup`: transport and listener facts, `receivers:`
     examples (stock defaults, minimal override, TLS, mTLS on both
     listeners), env-var names, `X-Scope-OrgID` as gRPC metadata or

@@ -35,10 +35,12 @@ parity is possible.
 
 - Netdata accepts metrics, logs, and traces via OTLP/gRPC (port 4317,
   on by default) or OTLP/HTTP (port 4318, once the Agent sets
-  `receivers.otlp.protocols.http.enabled: true`). Traces
-  need a Netdata Agent built from `master` after 2026-08-17 (nightly)
-  or the first stable release after v2.11.1. Stable v2.11.x has no
-  trace receiver; on it, keep traces on the old backend until the
+  `receivers.otlp.protocols.http.enabled: true`). If the Agent has no
+  OTLP/HTTP listener (receiver-format check in
+  `skills/netdata-otel-setup/rules/enable-otlp-receiver.md`), use gRPC on
+  4317. Traces need a Netdata Agent built from `master` after 2026-08-17
+  (nightly) or the first stable release after v2.11.1. Stable v2.11.x
+  has no trace receiver; on it, keep traces on the old backend until the
   Agent is upgraded.
 - Netdata's Traces tab covers trace search, lookup by trace ID, the
   slowest traces, a duration overview, and attribute facets. It is

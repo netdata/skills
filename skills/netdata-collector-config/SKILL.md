@@ -39,7 +39,9 @@ Netdata.
   `receivers.otlp.protocols.http.enabled: true`). The Collector's
   `otlp` exporter speaks gRPC and works with a stock Agent. The
   `otlphttp` exporter takes a full URL (`http://HOST:4318`) and
-  needs the Agent's OTLP/HTTP listener.
+  needs the Agent's OTLP/HTTP listener. If the Agent has no OTLP/HTTP
+  listener (receiver-format check in the otel-setup skill,
+  `rules/enable-otlp-receiver.md`), use the `otlp` exporter on 4317.
 - TLS on the Collector-to-Netdata hop is configured on the
   exporter's `tls:` block. Netdata's server-side config is covered
   in the otel-setup skill.

@@ -49,6 +49,10 @@ OTLP/HTTP.
   `tls_cert_path`, `tls_key_path`, `tls_ca_cert_path`). Those names still
   work and log a deprecation warning; a value under `receivers:` wins when
   a file sets both.
+- Receiver-format check: an Agent whose stock `otel.yaml` has only an
+  `endpoint:` section has no OTLP/HTTP listener, and its plugin stops at
+  startup on a `receivers:` section. There, configure gRPC under
+  `endpoint:` and send gRPC to port 4317. Step 3 runs the check.
 - Signals accepted, by Agent version:
   - Metrics: v2.7.0 and later.
   - Logs: v2.9.0 and later. v2.11.0 replaced the journal-file store with an
@@ -116,9 +120,22 @@ OTLP/HTTP.
    sudo ./edit-config otel.yaml
    ```
 
-3. Set the listeners. For local-only gRPC traffic, leave the defaults.
-   Turn on the OTLP/HTTP listener when senders use OTLP/HTTP. For remote
-   OTLP clients, bind on `0.0.0.0` and protect each port (TLS, firewall).
+3. Check the receiver format, then set the listeners. Read the Agent's
+   stock `otel.yaml`, not the user copy:
+
+   ```bash
+   grep -E '^(receivers|endpoint):' /usr/lib/netdata/conf.d/otel.yaml \
+     /opt/netdata/usr/lib/netdata/conf.d/otel.yaml 2>/dev/null
+   # Docker: docker exec netdata grep -E '^(receivers|endpoint):' \
+   #   /usr/lib/netdata/conf.d/otel.yaml
+   ```
+
+   Only `endpoint:` means the Agent has no OTLP/HTTP listener: configure
+   gRPC under `endpoint:` and send gRPC to port 4317 (example in
+   [`rules/enable-otlp-receiver.md`](./rules/enable-otlp-receiver.md)).
+   With `receivers:`, leave the defaults for local-only gRPC traffic, turn
+   on the OTLP/HTTP listener when senders use OTLP/HTTP, and for remote
+   OTLP clients bind on `0.0.0.0` and protect each port (TLS, firewall).
 
    ```yaml
    receivers:

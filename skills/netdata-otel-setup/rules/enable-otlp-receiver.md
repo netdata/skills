@@ -3,8 +3,46 @@
 ## Scope
 
 Bring the `otel-plugin` online and accept OTLP/gRPC, OTLP/HTTP, or both on
-specific network endpoints. Covers the stock defaults, minimal user
-override, bind address choices, and restart flow.
+specific network endpoints. Covers the receiver-format check, stock
+defaults, minimal user override, bind address choices, and restart flow.
+
+## Check the receiver format first
+
+Before writing or editing receiver config, read the Agent's stock
+`otel.yaml`, not the user copy. `edit-config` copies the stock file only
+when no user copy exists, so a user copy can carry an older format.
+
+```bash
+# Native packages and static installs (/opt/netdata):
+grep -E '^(receivers|endpoint):' /usr/lib/netdata/conf.d/otel.yaml \
+  /opt/netdata/usr/lib/netdata/conf.d/otel.yaml 2>/dev/null
+# Docker (container named netdata):
+docker exec netdata grep -E '^(receivers|endpoint):' \
+  /usr/lib/netdata/conf.d/otel.yaml
+```
+
+No output: find the stock directory with `sudo ./edit-config --help`, run
+in the config directory.
+
+- `receivers:`: use the listener format in this file.
+- Only `endpoint:`: the Agent has no OTLP/HTTP listener. Configure the
+  gRPC listener under `endpoint:` and point every sender at gRPC on port
+  4317. The matching variables are `NETDATA_OTEL_CFG_ENDPOINT_PATH`,
+  `NETDATA_OTEL_CFG_ENDPOINT_TLS_CERT_PATH`,
+  `NETDATA_OTEL_CFG_ENDPOINT_TLS_KEY_PATH`, and
+  `NETDATA_OTEL_CFG_ENDPOINT_TLS_CA_CERT_PATH`.
+
+```yaml
+endpoint:
+  path: "0.0.0.0:4317"
+  tls_cert_path: /etc/netdata/ssl/otel-cert.pem      # TLS needs cert and key
+  tls_key_path: /etc/netdata/ssl/otel-key.pem
+  tls_ca_cert_path: /etc/netdata/ssl/client-ca.pem   # optional: mTLS
+```
+
+Source: `system/edit-config` and `src/crates/otel-plugin/src/config/mod.rs`
+(the plugin reads `$NETDATA_STOCK_CONFIG_DIR/otel.yaml`) in the Netdata
+repo.
 
 ## Default behavior
 
