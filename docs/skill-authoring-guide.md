@@ -44,7 +44,7 @@ The agent reads every skill's frontmatter, compares the user prompt against the 
 ### Good description
 
 ```yaml
-description: Use when enabling the Netdata otel.plugin, writing /etc/netdata/otel.yaml, defining metric-to-chart mappings, configuring TLS on the OTLP receiver, setting log or trace retention, or debugging OTLP ingestion issues with Netdata. Covers OTLP gRPC ingestion for metrics (v2.7.0+), logs (v2.9.0+, current storage schema v2.11.0+), and traces (nightly builds after v2.11.1; not in stable v2.11.x).
+description: Use when enabling the Netdata otel.plugin, writing /etc/netdata/otel.yaml, defining metric-to-chart mappings, configuring TLS on the OTLP receiver, setting log or trace retention, or debugging OTLP ingestion issues with Netdata. Covers OTLP gRPC and HTTP ingestion for metrics (v2.7.0+), logs (v2.9.0+, current storage schema v2.11.0+), and traces (nightly builds after v2.11.1; not in stable v2.11.x).
 ```
 
 Why it works:

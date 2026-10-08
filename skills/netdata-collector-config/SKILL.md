@@ -34,8 +34,12 @@ Netdata.
 
 ## Key facts
 
-- Only OTLP/gRPC is accepted by Netdata. The Collector's
-  `otlp` exporter is the one to use; set `protocol: grpc`.
+- Netdata receives OTLP over gRPC (port 4317, on by default) or
+  HTTP (port 4318, once the Agent sets
+  `receivers.otlp.protocols.http.enabled: true`). The Collector's
+  `otlp` exporter speaks gRPC and works with a stock Agent. The
+  `otlphttp` exporter takes a full URL (`http://HOST:4318`) and
+  needs the Agent's OTLP/HTTP listener.
 - TLS on the Collector-to-Netdata hop is configured on the
   exporter's `tls:` block. Netdata's server-side config is covered
   in the otel-setup skill.
@@ -87,8 +91,9 @@ Netdata.
 
 ## Common mistakes
 
-- Enabling the Collector's default `otlphttp` exporter. Netdata
-  accepts gRPC only.
+- Pointing the `otlphttp` exporter at port 4317, or at an Agent
+  whose OTLP/HTTP listener is off (the default). Use port 4318 with
+  the listener on, or the `otlp` exporter on port 4317.
 - Adding a `traces` pipeline against a stable v2.11.x Agent. It has
   no trace receiver, so every trace export fails and the Collector
   drops the spans. Check trace support first.

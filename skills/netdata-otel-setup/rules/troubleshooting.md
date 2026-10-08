@@ -17,19 +17,22 @@
 2. **Is the port bound?**
 
    ```bash
-   ss -tlnp | grep 4317
+   ss -tlnp | grep -E '4317|4318'
    ```
 
-   If unbound, the plugin crashed during init. Look for "address already
-   in use", "permission denied", an invalid bind string, or a strict
-   `otel.yaml` parsing error in the journal. Keys from the v2.10 schema
+   Port 4318 appears only with the OTLP/HTTP listener on. If an enabled
+   listener is unbound, the plugin crashed during init. Look for
+   "address already in use", "permission denied", an invalid bind string,
+   or a strict `otel.yaml` parsing error in the journal. Keys from the v2.10 schema
    (`size_of_journal_file`, `store_otlp_json`, and similar) are a common cause
    after an upgrade.
 
 3. **Is the client hitting the right host and protocol?**
 
-   OTLP/gRPC only. OTLP/HTTP (port 4318) is not accepted. Confirm with a
-   quick TLS-off gRPC probe:
+   gRPC goes to port 4317. OTLP/HTTP goes to port 4318 and needs
+   `receivers.otlp.protocols.http.enabled: true`; its exporters post to
+   `/v1/metrics`, `/v1/logs`, and `/v1/traces`. Confirm the gRPC listener
+   with a quick TLS-off probe:
 
    ```bash
    grpcurl -plaintext -d '{}' <HOST>:4317 list
@@ -96,8 +99,8 @@ Usually one of:
 
 - The Agent has no trace receiver. Stable v2.11.x and older do not
   accept traces; see `trace-ingestion.md` for the version check.
-- The SDK uses OTLP/HTTP. Set `OTEL_EXPORTER_OTLP_PROTOCOL=grpc` and
-  port 4317.
+- The SDK's protocol and port do not match. `http/protobuf` needs port
+  4318 with the OTLP/HTTP listener on; `grpc` needs port 4317.
 - The SDK trace exporter is still `none`
   (`OTEL_TRACES_EXPORTER=none`), a leftover from before trace support.
 - The spans fall outside the accepted window: started more than 24 hours
@@ -115,12 +118,17 @@ Three likely causes:
 - Cert/key not readable by the `netdata` user.
 - Hostname mismatch. The producer is connecting to an address not on the
   cert's SAN list.
-- Producer sending HTTP to a TLS-enabled port. Send TLS or disable it.
+- Producer sending plaintext (`http://`) to a TLS-enabled listener. Send
+  TLS (`https://`) or disable it.
 
 ### "mTLS accepts everyone"
 
-`tls_ca_cert_path` requires both `tls_cert_path` and `tls_key_path` to
-also be set. Setting the CA alone does nothing.
+TLS settings are per listener. mTLS on the gRPC listener does not protect
+an OTLP/HTTP listener without its own `tls.client_ca_file`. Give every
+enabled listener the CA, or turn off the one no sender uses.
+
+`tls.client_ca_file` requires `tls.cert_file` and `tls.key_file` on the
+same listener. Setting the CA alone stops the plugin from starting.
 
 ### "Env-var override has no effect"
 
@@ -144,7 +152,7 @@ When filing a bug or asking a human for help, collect:
 ```bash
 netdata -v
 pgrep -a otel-plugin
-ss -tlnp | grep 4317
+ss -tlnp | grep -E '4317|4318'
 sudo journalctl -u netdata --since "10 minutes ago" > /tmp/netdata.log
 ls -l /etc/netdata/otel.yaml /etc/netdata/otel.d/v1/metrics/
 ```

@@ -15,8 +15,10 @@ receivers:
 ```
 
 Enabling both gives clients a choice. The `http` protocol accepts
-HTTP/JSON from browsers and legacy tools. Netdata's own receiver is
-gRPC-only but the Collector in front of it can be polyglot.
+HTTP/JSON from browsers and legacy tools. Netdata's own receiver takes
+both protocols too; its OTLP/HTTP listener is off by default. On the
+Agent's host, the Collector cannot bind the ports the Agent listens on
+(4317, and 4318 with OTLP/HTTP on); give its receiver other ports.
 
 ## hostmetrics (node-level signals)
 

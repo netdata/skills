@@ -141,7 +141,8 @@ under the service name.
 
 ## What Netdata does with OTLP logs
 
-OTLP/gRPC log ingestion is always on once `otel-plugin` is running.
+OTLP log ingestion is always on once `otel-plugin` is running, over gRPC
+and, with the Agent's OTLP/HTTP listener on, over HTTP.
 On v2.11.0 and later, records are indexed under
 `/var/log/netdata/otel/v2/logs` and explored in the Logs tab
 (`otel-logs` source, filtered by service). Retention lives under

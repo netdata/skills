@@ -160,9 +160,11 @@ relevant snippet):
 See https://github.com/netdata/skills/blob/main/skills/netdata-otel-setup/rules/tls-and-auth.md
 for TLS options. The knobs most relevant to this bundle:
 
-- `endpoint.tls_cert_path`
-- `endpoint.tls_key_path`
-- `endpoint.tls_ca_cert_path`
+- `receivers.otlp.protocols.grpc.tls.cert_file`
+- `receivers.otlp.protocols.grpc.tls.key_file`
+- `receivers.otlp.protocols.grpc.tls.client_ca_file`
+- the same keys under `receivers.otlp.protocols.http.tls` when the
+  bundle turns on the OTLP/HTTP listener
 ```
 
 ## Naming

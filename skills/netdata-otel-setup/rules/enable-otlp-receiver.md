@@ -1,27 +1,41 @@
-# Enable the OTLP/gRPC receiver
+# Enable the OTLP receiver
 
 ## Scope
 
-Bring the `otel-plugin` online and accept OTLP/gRPC traffic on a specific
-network endpoint. Covers the stock defaults, minimal user override, bind
-address choices, and restart flow.
+Bring the `otel-plugin` online and accept OTLP/gRPC, OTLP/HTTP, or both on
+specific network endpoints. Covers the stock defaults, minimal user
+override, bind address choices, and restart flow.
 
 ## Default behavior
 
-Out of the box, the plugin listens on `127.0.0.1:4317` (gRPC only). Metrics,
-logs, and traces are all accepted on the same port. Traces need an Agent
-built from `master` after 2026-08-17 (nightly) or the first stable release
-after v2.11.1; stable v2.11.x does not register a trace service.
+Out of the box, the plugin listens for OTLP/gRPC on `127.0.0.1:4317`. The
+OTLP/HTTP listener on `127.0.0.1:4318` is off until
+`receivers.otlp.protocols.http.enabled: true`. Each listener accepts
+metrics, logs, and traces. Traces need an Agent built from `master` after
+2026-08-17 (nightly) or the first stable release after v2.11.1; stable
+v2.11.x does not register a trace service.
 
-Stock settings, reproduced from the shipped `otel.yaml` on a nightly
-Agent (comments removed; Linux package paths):
+Stock settings, reproduced from the shipped `otel.yaml` (comments removed;
+Linux package paths):
 
 ```yaml
-endpoint:
-  path: "127.0.0.1:4317"
-  tls_cert_path: null
-  tls_key_path: null
-  tls_ca_cert_path: null
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        enabled: true
+        endpoint: "127.0.0.1:4317"
+        tls:
+          cert_file: null
+          key_file: null
+          client_ca_file: null
+      http:
+        enabled: false
+        endpoint: "127.0.0.1:4318"
+        tls:
+          cert_file: null
+          key_file: null
+          client_ca_file: null
 
 metrics:
   chart_configs_dir: /etc/netdata/otel.d/v1/metrics
@@ -63,7 +77,12 @@ traces:
       max_age: "7 days"
 ```
 
-Stable v2.11.x ships the same file without the `traces:` section. Agents
+Older files configure the gRPC listener in an `endpoint:` section
+(`path`, `tls_cert_path`, `tls_key_path`, `tls_ca_cert_path`). These names
+still work and log a deprecation warning. If a file sets an option under
+both names, the value under `receivers:` wins.
+
+Stable v2.11.x ships an older stock file, without the `traces:` section. Agents
 before v2.11.0 used a different `logs:` schema (`size_of_journal_file`,
 `store_otlp_json`, and similar); those keys now stop the plugin at
 startup. `logs.journal_dir` is still accepted, only to locate the former
@@ -74,14 +93,30 @@ plugin's read-only journals.
 Only write the fields you are changing. Omitted fields keep their stock
 values. Parsing is strict: an unknown field, a malformed value, a
 `traces:` section on an Agent without trace support, or a conflicting
-combination (such as a TLS certificate without its key) stops the plugin
-from starting.
+combination (such as a TLS certificate without its key, both listeners
+disabled, or two enabled listeners claiming the same socket) stops the
+plugin from starting.
 
 ```yaml
 # /etc/netdata/otel.yaml
-endpoint:
-  path: "0.0.0.0:4317"
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "0.0.0.0:4317"
 ```
+
+To also receive OTLP/HTTP, turn on its listener:
+
+```yaml
+receivers:
+  otlp:
+    protocols:
+      http:
+        enabled: true
+```
+
+Turn off a listener that no sender uses (`enabled: false`).
 
 Edit via:
 
@@ -91,6 +126,9 @@ sudo ./edit-config otel.yaml
 ```
 
 ## Bind address choices
+
+Each listener has its own `endpoint`. The forms below apply to both; the
+OTLP/HTTP listener uses its own port (stock `127.0.0.1:4318`).
 
 | Bind address | Who can send OTLP |
 |---|---|
@@ -110,13 +148,14 @@ Any config option can be overridden at process launch. The env var name is
 underscores. For `default` rotation and retention entries, drop the
 `default` segment (`traces.retention.default.max_age` becomes
 `NETDATA_OTEL_CFG_TRACES_RETENTION_MAX_AGE`). Unknown `NETDATA_OTEL_CFG_*`
-variables stop the plugin. Agents before v2.11.0 used the `NETDATA_OTEL_`
-prefix.
+variables stop the plugin. The older `NETDATA_OTEL_CFG_ENDPOINT_*` names
+still work and log a deprecation warning. Agents before v2.11.0 used the
+`NETDATA_OTEL_` prefix.
 
 ```bash
-# One-shot: make the receiver listen on a nonstandard port without editing
+# One-shot: make the gRPC listener use a nonstandard port without editing
 # otel.yaml.
-sudo systemctl set-environment NETDATA_OTEL_CFG_ENDPOINT_PATH=0.0.0.0:4319
+sudo systemctl set-environment NETDATA_OTEL_CFG_RECEIVERS_OTLP_PROTOCOLS_GRPC_ENDPOINT=0.0.0.0:4319
 sudo systemctl restart netdata
 ```
 
@@ -127,10 +166,10 @@ Env vars have the highest priority: stock config, then user config, then env.
 ```bash
 sudo systemctl restart netdata
 pgrep -a otel-plugin
-ss -tlnp | grep 4317
+ss -tlnp | grep -E '4317|4318'
 ```
 
-If `ss` shows no listener on 4317 after restart, inspect:
+If `ss` shows no listener for an enabled protocol after restart, inspect:
 
 ```bash
 sudo journalctl SYSLOG_IDENTIFIER=otel-plugin \
@@ -138,5 +177,5 @@ sudo journalctl SYSLOG_IDENTIFIER=otel-plugin \
 ```
 
 Typical first-boot errors: bind permission denied on a privileged port,
-address already in use, invalid bind string, or a strict-parsing
-error on `otel.yaml`.
+address already in use (often a local OTel Collector on 4317 or 4318),
+invalid bind string, or a strict-parsing error on `otel.yaml`.
